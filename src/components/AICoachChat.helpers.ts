@@ -1,6 +1,6 @@
 // Exported for external use (e.g. future Claude API integration)
 export function buildSystemPrompt(fileContent?: string, dashboardContext?: string): string {
-  let prompt = `You are the AI Coach for the SPORTING CP Website Management System.
+  let prompt = `You are the AI Coach for the Bodø/Glimt Website Management System.
 
 Scale Algorithm:
 - ROAS > 5.0 → SCALE (+15% budget)

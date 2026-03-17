@@ -61,7 +61,7 @@ function parseCSVRows(text: string): Record<string, string>[] {
 }
 
 function buildSystemPrompt(report: DiagnosisReport | null, dashboardContext?: string): string {
-  return `You are "Scale" — an advanced Strategic AI Analyst for E-commerce, embedded in the SPORTING CP Website Management System.
+  return `You are "Scale" — an advanced Strategic AI Analyst for E-commerce, embedded in the Bodø/Glimt Website Management System.
 
 ## Your Identity
 Never present dry data. Every metric must be wrapped in business context.

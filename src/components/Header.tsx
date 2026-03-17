@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <img
               src="/sporting-cp/sporting-cp-logo.png"
-              alt="Sporting CP - Bodø/Glimt"
+              alt="Bodø/Glimt"
               className="w-11 h-11 rounded-full border-2 border-electric-yellow shadow-yellow-sm"
             />
             {/* Live pulse dot */}
@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div>
             <h1 className="font-display font-black text-white uppercase tracking-widest text-base leading-none">
-              Sporting CP - Bodø/Glimt
+              Bodø/Glimt
             </h1>
             <p className="text-electric-yellow text-[10px] tracking-widest uppercase font-mono mt-0.5">
               Website Management System
