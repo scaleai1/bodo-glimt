@@ -110,6 +110,14 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesLoaded, isCol
     setTotalSize(result.reduce((s, f) => s + f.size, 0));
     onFilesLoaded(result);
     setUploadState('done');
+    // Auto-reset to idle so the drop zone is always ready for more files
+    setTimeout(() => {
+      setUploadState('idle');
+      setLoadedNames([]);
+      setTotalSize(0);
+      setProgress(0);
+      if (inputRef.current) inputRef.current.value = '';
+    }, 1800);
   }, [onFilesLoaded]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -169,12 +177,6 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesLoaded, isCol
             <p className="text-text-secondary text-[10px] mt-0.5">CSV · XLSX · JSON — up to 10 files</p>
           </div>
         </div>
-        {uploadState === 'done' && (
-          <button onClick={reset}
-            className="text-[10px] text-text-secondary hover:text-electric-yellow uppercase tracking-wider font-bold transition-colors">
-            ↺ Reset
-          </button>
-        )}
       </div>
 
       {/* Drop Zone */}
@@ -182,7 +184,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesLoaded, isCol
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={() => uploadState === 'idle' && inputRef.current?.click()}
+        onClick={() => !['processing', 'dragover'].includes(uploadState) && inputRef.current?.click()}
         className={`
           relative rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer
           flex flex-col items-center justify-center gap-3 p-8 text-center
@@ -191,7 +193,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesLoaded, isCol
             : uploadState === 'processing'
             ? 'border-electric-yellow/40 bg-pitch-dark cursor-not-allowed'
             : uploadState === 'done'
-            ? 'border-success-green bg-success-green/5 cursor-default'
+            ? 'border-success-green bg-success-green/5 hover:border-success-green/70 hover:bg-success-green/10'
             : uploadState === 'error'
             ? 'border-danger-red bg-danger-red/5'
             : 'border-border-dark bg-pitch-dark hover:border-electric-yellow/60 hover:bg-electric-yellow/5'}
@@ -252,17 +254,11 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onFilesLoaded, isCol
           <>
             <div className="text-4xl">✅</div>
             <p className="text-success-green font-display font-black uppercase tracking-widest text-sm">
-              {loadedNames.length > 1 ? `${loadedNames.length} Files Loaded` : 'Data Loaded'}
+              {loadedNames.length > 1 ? `${loadedNames.length} Files Added` : 'File Added'}
             </p>
             <p className="text-text-secondary text-[10px]">
-              {formatBytes(totalSize)} · {loadedNames.length} file{loadedNames.length > 1 ? 's' : ''} — Ready for analysis
+              {formatBytes(totalSize)} · Added to analysis
             </p>
-            <div className="flex items-center gap-1 px-3 py-1 bg-success-green/10 border border-success-green/30 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-success-green" />
-              <span className="text-success-green text-[10px] font-bold uppercase tracking-wider">
-                Ask the AI Coach about {loadedNames.length > 1 ? 'these files' : 'this file'}
-              </span>
-            </div>
           </>
         )}
 

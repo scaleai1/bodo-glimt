@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { PlayerCard } from '../components/PlayerCard';
 import type { Campaign } from '../components/PlayerCard';
 import { LeakingPipeFunnel } from '../components/LeakingPipeFunnel';
@@ -207,6 +207,7 @@ const Dashboard: React.FC = () => {
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
   const [secondFile, setSecondFile]     = useState<UploadedFile | null>(null);
   const [allFiles, setAllFiles]         = useState<UploadedFile[]>([]);
+  const allFilesRef                     = useRef<UploadedFile[]>([]);
   const [uploaderKey, setUploaderKey]   = useState(0);
   const [liveReport, setLiveReport]     = useState<DiagnosisReport | null>(null);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
@@ -216,6 +217,7 @@ const Dashboard: React.FC = () => {
     setUploadedFile(files[0] ?? null);
     setSecondFile(files[1] ?? null);
     setAllFiles(files);
+    allFilesRef.current = files;
 
     const campaignTexts: string[] = [];
     const funnelTexts: string[] = [];
@@ -233,12 +235,20 @@ const Dashboard: React.FC = () => {
     if (report.campaigns.length > 0) setBudgetPlayers(reportToBudgetPlayers(report));
   };
 
-  const handleFilesLoaded = (files: UploadedFile[]) => applyFiles(files);
+  const handleFilesLoaded = useCallback((files: UploadedFile[]) => {
+    // Read from ref — always current, no stale closure risk
+    const merged = [...allFilesRef.current];
+    for (const f of files) {
+      if (!merged.find((x) => x.name === f.name)) merged.push(f);
+    }
+    applyFiles(merged.slice(0, 10));
+  }, []);
 
   const removeFile = (name: string) => {
     const remaining = allFiles.filter((f) => f.name !== name);
     if (remaining.length === 0) {
       setAllFiles([]);
+      allFilesRef.current = [];
       setUploadedFile(null);
       setSecondFile(null);
       setLiveReport(null);
@@ -295,7 +305,7 @@ const Dashboard: React.FC = () => {
 
       <Header
         criticalCount={criticalCount}
-        uploadedFileName={uploadedFile?.name}
+        uploadedFileName={allFiles.length > 0 ? allFiles.map(f => f.name).join(' + ') : undefined}
         onToggleChat={() => setIsChatOpen((o) => !o)}
         isChatOpen={isChatOpen}
       />
@@ -334,7 +344,7 @@ const Dashboard: React.FC = () => {
                     {allFiles.length} file{allFiles.length > 1 ? 's' : ''} loaded
                   </span>
                   <button
-                    onClick={() => { setAllFiles([]); setUploadedFile(null); setSecondFile(null); setLiveReport(null); setUploaderKey((k) => k + 1); }}
+                    onClick={() => { setAllFiles([]); allFilesRef.current = []; setUploadedFile(null); setSecondFile(null); setLiveReport(null); setUploaderKey((k) => k + 1); }}
                     className="text-[10px] text-text-secondary hover:text-danger-red uppercase tracking-wider font-bold transition-colors"
                   >
                     Clear all
@@ -366,7 +376,7 @@ const Dashboard: React.FC = () => {
           {hasLive && liveReport && (
             <LiveInsightsTiles
               report={liveReport}
-              fileNames={[uploadedFile?.name ?? '', secondFile?.name ?? ''].filter(Boolean)}
+              fileNames={allFiles.map(f => f.name)}
               secondFileContent={secondFile?.content}
             />
           )}
@@ -465,7 +475,7 @@ const Dashboard: React.FC = () => {
           isOpen={isInsightsOpen}
           onClose={() => setIsInsightsOpen(false)}
           report={liveReport}
-          fileName={uploadedFile?.name ?? 'Uploaded file'}
+          fileName={allFiles.length > 0 ? allFiles.map(f => f.name).join(' + ') : 'Uploaded file'}
         />
       )}
     </div>
