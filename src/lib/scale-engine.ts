@@ -408,6 +408,74 @@ export function runDiagnosis(
   };
 }
 
+// ─── pruneCSV ─────────────────────────────────────────────────────────────────
+
+const CAMPAIGN_COLS = ['campaign','name','platform','spend','revenue','roas','ctr',
+  'clicks','impressions','conversions','country','audience','format','placement'];
+const FUNNEL_COLS = ['step','stage','page','name','users','sessions','visits'];
+
+export function pruneCSV(text: string): string {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return text;
+  const delim = lines[0].includes('\t') ? '\t' : ',';
+  const rawHeaders = lines[0].split(delim).map((h) => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+
+  const isCampaign =
+    CAMPAIGN_COLS.filter((c) => rawHeaders.some((h) => h.includes(c))).length >=
+    FUNNEL_COLS.filter((c) => rawHeaders.some((h) => h.includes(c))).length;
+  const allowList = isCampaign ? CAMPAIGN_COLS : FUNNEL_COLS;
+
+  const keepIdx = rawHeaders
+    .map((h, i) => ({ h, i }))
+    .filter(({ h }) => allowList.some((a) => h.includes(a)))
+    .map(({ i }) => i);
+
+  if (keepIdx.length === 0) return text;
+
+  return lines.map((line) => {
+    const vals = line.split(delim);
+    return keepIdx.map((i) => vals[i] ?? '').join(delim);
+  }).join('\n');
+}
+
+// ─── summarizeForLLM ──────────────────────────────────────────────────────────
+
+export function summarizeForLLM(report: DiagnosisReport, maxCampaigns = 15): string {
+  const sortedBySpend = [...report.campaigns].sort((a, b) => b.spend - a.spend);
+  const sortedByRoas  = [...report.campaigns].sort((a, b) => b.roas - a.roas);
+  const critical = report.campaigns.filter((c) => c.status === 'CRITICAL');
+
+  const topBySpend = sortedBySpend.slice(0, maxCampaigns);
+  const combined = [...topBySpend];
+  for (const c of critical) {
+    if (!combined.find((x) => x.name === c.name)) combined.push(c);
+  }
+
+  return JSON.stringify({
+    summary: {
+      totalCampaigns: report.campaigns.length,
+      totalSpend: report.totalSpend,
+      totalRevenue: report.totalRevenue,
+      blendedRoas: +report.blendedRoas.toFixed(2),
+      criticalCount: critical.length,
+    },
+    top3ByRoas: sortedByRoas.slice(0, 3).map((c) => ({
+      name: c.name, platform: c.platform, country: c.country,
+      roas: +c.roas.toFixed(2), spend: c.spend, status: c.status,
+    })),
+    bottom3ByRoas: sortedByRoas.slice(-3).map((c) => ({
+      name: c.name, platform: c.platform, country: c.country,
+      roas: +c.roas.toFixed(2), spend: c.spend, status: c.status,
+    })),
+    campaigns: combined.map((c) => ({
+      name: c.name, platform: c.platform, country: c.country,
+      spend: c.spend, revenue: c.revenue, roas: +c.roas.toFixed(2),
+      status: c.status, ctr: +c.ctr.toFixed(1), conversions: c.conversions,
+      conversionRate: +c.conversionRate.toFixed(2),
+    })),
+  }, null, 2);
+}
+
 // ─── Format report as chat message ───────────────────────────────────────────
 
 export function formatDiagnosisMessage(r: DiagnosisReport): string {

@@ -200,18 +200,14 @@ const Dashboard: React.FC = () => {
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [budgetPlayers, setBudgetPlayers]   = useState<BudgetPlayer[]>(MOCK_BUDGET_PLAYERS);
 
-  const handleFileLoaded = (file: UploadedFile) => {
-    if (!uploadedFile) {
-      setUploadedFile(file);
-      const report = runDiagnosis(file.content, secondFile?.content);
-      setLiveReport(report);
-      if (report.campaigns.length > 0) setBudgetPlayers(reportToBudgetPlayers(report));
-    } else if (!secondFile || file.name !== uploadedFile.name) {
-      setSecondFile(file);
-      const report = runDiagnosis(uploadedFile.content, file.content);
-      setLiveReport(report);
-      if (report.campaigns.length > 0) setBudgetPlayers(reportToBudgetPlayers(report));
-    }
+  const handleFilesLoaded = (files: UploadedFile[]) => {
+    const file1 = files[0];
+    const file2 = files[1] ?? null;
+    setUploadedFile(file1);
+    setSecondFile(file2);
+    const report = runDiagnosis(file1.content, file2?.content);
+    setLiveReport(report);
+    if (report.campaigns.length > 0) setBudgetPlayers(reportToBudgetPlayers(report));
   };
 
   const hasLive = liveReport !== null;
@@ -261,7 +257,7 @@ const Dashboard: React.FC = () => {
 
       <Header
         criticalCount={criticalCount}
-        uploadedFileName={uploadedFile?.name}
+        uploadedFileName={uploadedFile && secondFile ? `${uploadedFile.name} + ${secondFile.name}` : uploadedFile?.name}
         onToggleChat={() => setIsChatOpen((o) => !o)}
         isChatOpen={isChatOpen}
       />
@@ -287,7 +283,7 @@ const Dashboard: React.FC = () => {
           {/* Data Ingestion Hub */}
           <div className="mb-6">
             <FileUploader
-              onFileLoaded={handleFileLoaded}
+              onFilesLoaded={handleFilesLoaded}
               onInsightsClick={() => setIsInsightsOpen(true)}
               hasReport={hasInsightsData}
             />

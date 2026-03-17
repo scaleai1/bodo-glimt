@@ -5,6 +5,7 @@ import {
   detectFileType,
   analyzeCampaigns,
   analyzeFunnel,
+  summarizeForLLM,
 } from '../lib/scale-engine';
 import type { DiagnosisReport } from '../lib/scale-engine';
 
@@ -61,6 +62,17 @@ function parseCSVRows(text: string): Record<string, string>[] {
 }
 
 function buildSystemPrompt(report: DiagnosisReport | null, dashboardContext?: string): string {
+  const campaignData = report && report.campaigns.length > 0
+    ? (report.campaigns.length > 15
+        ? summarizeForLLM(report)
+        : JSON.stringify(report.campaigns.map(c => ({
+            name: c.name, platform: c.platform, country: c.country,
+            spend: c.spend, revenue: c.revenue, roas: +c.roas.toFixed(2),
+            status: c.status, ctr: +c.ctr.toFixed(1), conversions: c.conversions,
+            conversionRate: +c.conversionRate.toFixed(2),
+          })), null, 2))
+    : null;
+
   return `You are the strategic intelligence behind "ScaleAI" — an AI-powered command center for E-commerce owners. Your mission is to bridge the gap between complex marketing data (Facebook, Google, TikTok) and Shopify sales performance.
 
 ## Language & Tone
@@ -71,32 +83,32 @@ function buildSystemPrompt(report: DiagnosisReport | null, dashboardContext?: st
 - Always end with a clear next action.
 
 ## Core Algorithm — Go/No-Go (7-day rolling average)
-- ROAS > 5.0 → **SCALE**: המלץ על העלאת תקציב של +15%
-- ROAS 3.0–5.0 → **OPTIMIZE**: זהה עייפות ספציפית בקריאייטיב או בקהל
-- ROAS < 3.0 → **CRITICAL**: המלץ על עצירה מיידית
+- ROAS > 5.0 → **SCALE**: Recommend budget increase of +15%
+- ROAS 3.0–5.0 → **OPTIMIZE**: Identify specific creative or audience fatigue
+- ROAS < 3.0 → **CRITICAL**: Recommend immediate pause
 - Gross Margin: 40% | Break-even ROAS = 2.5x
-- **CR Guardrail**: אם CR < 2% בזמן שה-CTR גבוה → תעדף בעיות של דף נחיתה/צ'קאוט לפני קריאייטיב של המודעה
-- Retargeting ROAS חייב להיות ≥ 2× Prospecting ROAS
-- וידאו עם CTR גבוה אך ROAS נמוך → "מלכודת קריאייטיב — מעורבות גבוהה, אפס כוונת רכישה"
+- **CR Guardrail**: If CR < 2% while CTR is high → prioritize landing page/checkout issues before ad creative
+- Retargeting ROAS must be ≥ 2× Prospecting ROAS
+- Video with high CTR but low ROAS → "Creative Trap — high engagement, zero purchase intent"
 
 ## Funnel Diagnostics
-- ירידה > 30% → DROP DETECTED
-- ירידה > 50% → FLOW OBSTACLE
-- ירידה Cart→Checkout > 40% → CHECKOUT FRICTION
+- Drop > 30% → DROP DETECTED
+- Drop > 50% → FLOW OBSTACLE
+- Drop Cart→Checkout > 40% → CHECKOUT FRICTION
 
 ## Insight Tiles (when asked for full analysis or "diagnosis")
 Return 4–6 structured insight tiles in this exact format for each tile:
 **[TILE NAME]**
-ערך: [primary metric]
-הקשר: [one sentence — the "why" behind the number]
-סטטוס: [🟢 GREEN / 🟠 ORANGE / 🔴 RED]
-פעולה: [exact next step]
+Value: [primary metric]
+Context: [one sentence — the "why" behind the number]
+Status: [🟢 GREEN / 🟠 ORANGE / 🔴 RED]
+Action: [exact next step]
 
 Tile types to include:
-- "Winner Tile" — המנצח + למה לסקייל
-- "Budget Leak" — איפה הכסף הולם לאיבוד + תיקון
-- "Geographic Hotspot" — השוק הטוב ביותר + הזדמנות
-- "Optimization Target" — מה לתקן + השפעה צפויה
+- "Winner Tile" — top performer + why to scale
+- "Budget Leak" — where money is being wasted + fix
+- "Geographic Hotspot" — best market + opportunity
+- "Optimization Target" — what to fix + expected impact
 
 ## Contextual Memory
 Always reference the relationship between Ad Spend (Marketing) and Product Revenue (Shopify).
@@ -104,15 +116,10 @@ If a product sells well in a specific country (e.g., Israel / Germany) based on 
 
 ## Response Format
 - Use **bold** for key metrics and numbers
-- Short, punchy sentences in Hebrew
+- Short, punchy sentences
 - Every response implies an action: SCALE / PAUSE / INVESTIGATE / OPTIMIZE
 ${dashboardContext ? `\n## Live Dashboard Data\n${dashboardContext}` : ''}
-${report && report.campaigns.length > 0 ? `\n## Campaign Data (${report.campaigns.length} campaigns)\n${JSON.stringify(report.campaigns.map(c => ({
-  name: c.name, platform: c.platform, country: c.country,
-  spend: c.spend, revenue: c.revenue, roas: +c.roas.toFixed(2),
-  status: c.status, ctr: +c.ctr.toFixed(1), conversions: c.conversions,
-  conversionRate: +c.conversionRate.toFixed(2),
-})), null, 2)}` : ''}
+${campaignData ? `\n## Campaign Data (${report!.campaigns.length} campaigns)\n${campaignData}` : ''}
 ${report && report.funnelSteps.length > 0 ? `\n## Funnel Data\n${JSON.stringify(report.funnelSteps.map(s => ({
   step: s.label, users: s.users, dropPct: +s.dropPct.toFixed(1), alert: s.alertLevel,
 })), null, 2)}` : ''}
@@ -552,5 +559,4 @@ Be specific. Use exact Shopify terminology. No vague advice.`;
   );
 };
 
-export { buildSystemPrompt } from './AICoachChat.helpers';
 export default AICoachChat;
