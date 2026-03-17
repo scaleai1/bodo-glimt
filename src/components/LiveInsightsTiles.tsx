@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Anthropic from '@anthropic-ai/sdk';
-import type { DiagnosisReport } from '../lib/zolter-engine';
+import type { DiagnosisReport } from '../lib/scale-engine';
 
 interface InsightTile {
   type: string;
@@ -23,7 +23,7 @@ const client = new Anthropic({
   dangerouslyAllowBrowser: true,
 });
 
-const SYSTEM_PROMPT = `You are "Zolter" — Strategic AI Analyst for E-commerce.
+const SYSTEM_PROMPT = `You are "Scale" — Strategic AI Analyst for E-commerce.
 
 Generate exactly 10 Insight Tiles. You MUST cover ALL of the following dimensions — do not skip any that have data:
 
@@ -46,7 +46,7 @@ Rules:
 - Context sentence: max 14 words, must be action-oriented.
 - If a dimension has no data, replace with the next most valuable insight from the data.
 
-Zolter Algorithm:
+Scale Algorithm:
 - ROAS > 5.0 = SCALE | 3.0–5.0 = OPTIMIZE | < 3.0 = CRITICAL (break-even = 2.5x, 40% margin)
 - Retargeting ROAS must be ≥ 2× Prospecting
 - Funnel drop > 30% = DROP | > 50% = FLOW OBSTACLE
@@ -241,7 +241,7 @@ export const LiveInsightsTiles: React.FC<LiveInsightsTilesProps> = ({
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-electric-yellow animate-pulse" />
           <h2 className="text-white font-display font-black uppercase tracking-widest text-xs">
-            Zolter Live Insights
+            Scale Live Insights
           </h2>
           {!isLoading && tiles.length > 0 && (
             <span className="text-text-secondary text-[10px] font-mono hidden sm:inline">

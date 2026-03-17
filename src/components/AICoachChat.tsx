@@ -5,8 +5,8 @@ import {
   detectFileType,
   analyzeCampaigns,
   analyzeFunnel,
-} from '../lib/zolter-engine';
-import type { DiagnosisReport } from '../lib/zolter-engine';
+} from '../lib/scale-engine';
+import type { DiagnosisReport } from '../lib/scale-engine';
 
 export interface ChatMessage {
   id: string;
@@ -61,14 +61,14 @@ function parseCSVRows(text: string): Record<string, string>[] {
 }
 
 function buildSystemPrompt(report: DiagnosisReport | null, dashboardContext?: string): string {
-  return `You are "Zolter" — an advanced Strategic AI Analyst for E-commerce, embedded in the SPORTING CP Website Management System.
+  return `You are "Scale" — an advanced Strategic AI Analyst for E-commerce, embedded in the SPORTING CP Website Management System.
 
 ## Your Identity
 Never present dry data. Every metric must be wrapped in business context.
 Instead of "ROAS is 4.5" → say "Instagram is currently your most efficient growth channel at 4.5x ROAS."
 Be direct, punchy, and executive-level. No vague advice. Always end with a clear next action.
 
-## Zolter Algorithm (core decision framework)
+## Scale Algorithm (core decision framework)
 - ROAS > 5.0 → SCALE: increase budget +15%, expand audiences
 - ROAS 3.0–5.0 → OPTIMIZE: improve CTR, creative, targeting
 - ROAS < 3.0 → CRITICAL/STOP: pause immediately, reallocate budget
@@ -126,7 +126,7 @@ export const AICoachChat: React.FC<AICoachChatProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([{
     id: '0',
     role: 'assistant',
-    content: `Match Center is live. I'm your AI Coach powered by Claude.\n\nUpload a **CSV or Excel file** and I'll analyze it using the full Zolter algorithm.\n\nOr ask me anything — I have full context of your dashboard data.`,
+    content: `Match Center is live. I'm your AI Coach powered by Claude.\n\nUpload a **CSV or Excel file** and I'll analyze it using the full Scale algorithm.\n\nOr ask me anything — I have full context of your dashboard data.`,
     timestamp: formatTime(),
   }]);
 
@@ -283,7 +283,7 @@ export const AICoachChat: React.FC<AICoachChatProps> = ({
       ? `\n\nCONVERSION DATA:\nBlended ROAS: ${currentReport.blendedRoas.toFixed(2)}x | Total Revenue: $${currentReport.totalRevenue.toLocaleString()} | Total Spend: $${currentReport.totalSpend.toLocaleString()}\nCritical campaigns (ROAS < 2.5x): ${currentReport.criticalCampaigns.length}\nCheckout friction detected: ${currentReport.checkoutFriction ? 'YES' : 'NO'}\nBiggest funnel leak: ${currentReport.biggestLeak ?? 'not detected'}`
       : '';
 
-    const SITE_DIAGNOSIS_PROMPT = `You are "Zolter" — a Shopify & E-commerce Website Technical Auditor.
+    const SITE_DIAGNOSIS_PROMPT = `You are "Scale" — a Shopify & E-commerce Website Technical Auditor.
 
 Run a FULL SITE TECHNICAL DIAGNOSIS based on the available data. Your job is to find website bugs, UX blockers, and technical faults — NOT campaign performance.
 
@@ -466,7 +466,7 @@ Be specific. Use exact Shopify terminology. No vague advice.`;
               {msg.isReport && (
                 <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border-dark">
                   <span className="text-electric-yellow text-[10px] font-display font-black uppercase tracking-widest">
-                    ⚽ ZOLTER DIAGNOSIS REPORT
+                    ⚽ SCALE DIAGNOSIS REPORT
                   </span>
                 </div>
               )}

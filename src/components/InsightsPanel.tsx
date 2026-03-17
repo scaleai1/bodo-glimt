@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Anthropic from '@anthropic-ai/sdk';
-import type { DiagnosisReport } from '../lib/zolter-engine';
+import type { DiagnosisReport } from '../lib/scale-engine';
 
 interface InsightsPanelProps {
   isOpen: boolean;
@@ -23,14 +23,14 @@ const client = new Anthropic({
   dangerouslyAllowBrowser: true,
 });
 
-const ZOLTER_SYSTEM_PROMPT = `You are "Zolter" — an advanced Strategic AI Analyst for E-commerce.
+const SCALE_SYSTEM_PROMPT = `You are "Scale" — an advanced Strategic AI Analyst for E-commerce.
 
 Your task: Transform raw campaign & funnel data into 4-6 executive Insight Tiles.
 
 NEVER present dry data. Every metric must be wrapped in business context.
 Instead of "ROAS is 4.5" → say "Instagram is driving your growth | ROAS: 4.5x"
 
-Zolter Algorithm:
+Scale Algorithm:
 - ROAS > 5.0 → SCALE (+15% budget)
 - ROAS 3.0–5.0 → OPTIMIZE (CTR, creative, targeting)
 - ROAS < 3.0 → CRITICAL/STOP
@@ -156,7 +156,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({ isOpen, onClose, r
       const stream = client.messages.stream({
         model: 'claude-sonnet-4-6',
         max_tokens: 800,
-        system: ZOLTER_SYSTEM_PROMPT,
+        system: SCALE_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: `Generate Insight Tiles for this data from "${fileName}":\n\n${dataContext}` }],
       });
 
@@ -207,7 +207,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({ isOpen, onClose, r
               Z
             </div>
             <div>
-              <p className="text-white font-display font-black uppercase tracking-widest text-sm">Zolter Insight Tiles</p>
+              <p className="text-white font-display font-black uppercase tracking-widest text-sm">Scale Insight Tiles</p>
               <p className="text-text-secondary text-[10px] font-mono truncate max-w-[300px]">{fileName}</p>
             </div>
           </div>
@@ -221,7 +221,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({ isOpen, onClose, r
           {isLoading && tiles.length === 0 && (
             <div className="flex flex-col items-center gap-4 py-12">
               <span className="text-4xl animate-spin">⚽</span>
-              <p className="text-electric-yellow font-display font-black uppercase tracking-widest text-sm">Zolter is analysing...</p>
+              <p className="text-electric-yellow font-display font-black uppercase tracking-widest text-sm">Scale is analysing...</p>
               <p className="text-text-secondary text-xs font-mono">Generating strategic insight tiles</p>
               {rawText && (
                 <div className="w-full bg-card-dark border border-border-dark rounded-xl p-3 mt-2">
@@ -279,7 +279,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({ isOpen, onClose, r
         {isDone && (
           <div className="px-6 py-4 border-t border-border-dark shrink-0 flex items-center justify-between">
             <p className="text-text-secondary text-[10px] font-mono">
-              Zolter · {tiles.length} insight tile{tiles.length !== 1 ? 's' : ''} · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              Scale · {tiles.length} insight tile{tiles.length !== 1 ? 's' : ''} · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
             </p>
             <button
               onClick={runInsights}

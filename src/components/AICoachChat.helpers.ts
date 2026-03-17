@@ -2,7 +2,7 @@
 export function buildSystemPrompt(fileContent?: string, dashboardContext?: string): string {
   let prompt = `You are the AI Coach for the SPORTING CP Website Management System.
 
-Zolter Algorithm:
+Scale Algorithm:
 - ROAS > 5.0 → SCALE (+15% budget)
 - ROAS 3.0–5.0 → OPTIMIZE (CTR, creative, targeting)
 - ROAS < 3.0 → CRITICAL/STOP

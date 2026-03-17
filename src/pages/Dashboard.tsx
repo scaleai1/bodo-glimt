@@ -13,8 +13,8 @@ import type { UploadedFile } from '../components/FileUploader';
 import { AICoachChat } from '../components/AICoachChat';
 import { InsightsPanel } from '../components/InsightsPanel';
 import { LiveInsightsTiles } from '../components/LiveInsightsTiles';
-import { runDiagnosis } from '../lib/zolter-engine';
-import type { DiagnosisReport } from '../lib/zolter-engine';
+import { runDiagnosis } from '../lib/scale-engine';
+import type { DiagnosisReport } from '../lib/scale-engine';
 
 // ─── Mock fallback data (shown when no file is uploaded) ──────────────────────
 
@@ -293,7 +293,7 @@ const Dashboard: React.FC = () => {
             />
           </div>
 
-          {/* Zolter Live Insight Tiles — auto-generated from uploaded files */}
+          {/* Scale Live Insight Tiles — auto-generated from uploaded files */}
           {hasLive && liveReport && (
             <LiveInsightsTiles
               report={liveReport}
