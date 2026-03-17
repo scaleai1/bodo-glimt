@@ -206,6 +206,7 @@ const Dashboard: React.FC = () => {
   const [isChatOpen, setIsChatOpen]     = useState(false);
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
   const [secondFile, setSecondFile]     = useState<UploadedFile | null>(null);
+  const [allFileNames, setAllFileNames] = useState<string[]>([]);
   const [liveReport, setLiveReport]     = useState<DiagnosisReport | null>(null);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [budgetPlayers, setBudgetPlayers]   = useState<BudgetPlayer[]>(MOCK_BUDGET_PLAYERS);
@@ -213,6 +214,7 @@ const Dashboard: React.FC = () => {
   const handleFilesLoaded = (files: UploadedFile[]) => {
     setUploadedFile(files[0] ?? null);
     setSecondFile(files[1] ?? null);
+    setAllFileNames(files.map((f) => f.name));
 
     // Sort each file into campaign or funnel bucket, then merge within each type
     const campaignTexts: string[] = [];
@@ -309,6 +311,20 @@ const Dashboard: React.FC = () => {
               onInsightsClick={() => setIsInsightsOpen(true)}
               hasReport={hasInsightsData}
             />
+            {/* Loaded file names strip */}
+            {allFileNames.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {allFileNames.map((name, i) => (
+                  <span
+                    key={name}
+                    className="flex items-center gap-1 px-2 py-0.5 bg-card-dark border border-border-dark rounded text-[10px] font-mono text-text-secondary"
+                  >
+                    <span className="text-electric-yellow">{i + 1}</span>
+                    <span className="max-w-[180px] truncate text-white" title={name}>{name}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Scale Live Insight Tiles — auto-generated from uploaded files */}
