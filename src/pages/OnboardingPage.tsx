@@ -176,58 +176,80 @@ function FileAnalystSection() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 mt-2">
+      {/* Divider */}
       <div className="flex items-center gap-2">
         <div className="h-px flex-1 bg-white/[0.06]" />
-        <span className="text-[11px] text-white/25 uppercase tracking-widest">or analyze a file</span>
+        <span className="text-[11px] text-white/25 uppercase tracking-widest">or try now — no setup</span>
         <div className="h-px flex-1 bg-white/[0.06]" />
       </div>
 
-      <div
-        onClick={() => inputRef.current?.click()}
-        className="relative border border-dashed border-white/10 rounded-xl p-5 cursor-pointer text-center transition-colors hover:border-amber-400/30 hover:bg-amber-400/[0.02]"
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept=".csv,.xlsx,.xls,.pdf,.txt,.json,.md"
-          onChange={e => { const f = e.target.files?.[0]; if (f) analyzeFile(f); }}
-        />
-        {loading ? (
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 size={20} className="animate-spin text-amber-400" />
-            <span className="text-white/40 text-xs">Analyzing {file?.name}…</span>
+      {/* Header */}
+      <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-amber-400/10 border border-amber-400/20 rounded-lg flex items-center justify-center shrink-0">
+            <Activity size={15} className="text-amber-400" />
           </div>
-        ) : file ? (
-          <div className="flex items-center justify-center gap-2">
-            <FileText size={14} className="text-amber-400" />
-            <span className="text-white/60 text-xs">{file.name}</span>
-            <span className="text-white/25 text-xs">· click to change</span>
+          <div>
+            <div className="text-white text-sm font-bold leading-tight">AI File Analyst</div>
+            <div className="text-white/35 text-[11px] mt-0.5">Upload your ad data — get instant AI insights</div>
           </div>
-        ) : (
-          <div className="space-y-1">
-            <Upload size={18} className="mx-auto text-white/20" />
-            <p className="text-white/30 text-xs">Upload CSV, Excel, PDF or text file</p>
-            <p className="text-white/15 text-[10px]">Get instant AI analysis — no setup needed</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {['Campaign performance', 'Budget efficiency', 'ROAS breakdown', 'Growth opportunities'].map(tag => (
+            <span key={tag} className="text-[10px] px-2 py-0.5 bg-white/[0.04] text-white/30 rounded-full border border-white/[0.07]">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {/* Drop zone */}
+        <div
+          onClick={() => inputRef.current?.click()}
+          className="relative border border-dashed border-white/10 rounded-lg p-4 cursor-pointer text-center transition-colors hover:border-amber-400/30 hover:bg-amber-400/[0.02]"
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            accept=".csv,.xlsx,.xls,.pdf,.txt,.json,.md"
+            onChange={e => { const f = e.target.files?.[0]; if (f) analyzeFile(f); }}
+          />
+          {loading ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 size={18} className="animate-spin text-amber-400" />
+              <span className="text-white/40 text-xs">Analyzing {file?.name}…</span>
+            </div>
+          ) : file ? (
+            <div className="flex items-center justify-center gap-2">
+              <FileText size={13} className="text-amber-400" />
+              <span className="text-white/60 text-xs">{file.name}</span>
+              <span className="text-white/25 text-xs">· click to change</span>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Upload size={16} className="mx-auto text-white/20" />
+              <p className="text-white/30 text-xs">CSV · Excel · PDF · TXT</p>
+            </div>
+          )}
+        </div>
+
+        {err && (
+          <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/20 rounded-lg p-3">
+            <AlertCircle size={12} className="shrink-0" /> {err}
+          </div>
+        )}
+
+        {analysis && (
+          <div className="bg-amber-400/[0.04] border border-amber-400/15 rounded-lg p-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+              <Activity size={10} /> AI Insights
+            </div>
+            <p className="text-white/60 text-xs leading-relaxed whitespace-pre-wrap">{analysis}</p>
           </div>
         )}
       </div>
-
-      {err && (
-        <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/20 rounded-lg p-3">
-          <AlertCircle size={12} className="shrink-0" /> {err}
-        </div>
-      )}
-
-      {analysis && (
-        <div className="bg-amber-400/[0.04] border border-amber-400/15 rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-            <Activity size={10} /> AI Analysis
-          </div>
-          <p className="text-white/60 text-xs leading-relaxed whitespace-pre-wrap">{analysis}</p>
-        </div>
-      )}
     </div>
   );
 }
