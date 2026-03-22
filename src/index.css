@@ -4,8 +4,8 @@
 
 :root {
   /* ── Brand identity ──────────────────────────────────────────────────────── */
-  --brand-primary:        #FBBF24;
-  --brand-secondary:      #06D6F0;
+  --brand-primary:        #F0B429;
+  --brand-secondary:      #F5C842;
   --brand-logo:           url('/bodo-glimt/sporting-cp-logo.png');
 
   /* ── Semantic palette (overridden by BrandingService on Apply) ──────────── */
@@ -14,14 +14,14 @@
   --brand-surface-elv:    #1A1A1A;
   --brand-muted:          #2A2A2A;
   --brand-text-secondary: #9A9A9A;
-  --brand-glow:           rgba(251,191,36,0.3);
+  --brand-glow:           rgba(240,180,41,0.3);
   --brand-contrast:       #080808;
 
   /* ── Layout ─────────────────────────────────────────────────────────────── */
   --radius-size:          2px;
 
   /* ── Typography (overridden by BrandingService on Apply) ────────────────── */
-  --font-display: 'Barlow Condensed', Impact, 'Arial Black', sans-serif;
+  --font-display: 'Space Grotesk', 'DM Sans', Inter, system-ui, sans-serif;
   --font-body:    'DM Sans', Inter, system-ui, sans-serif;
 }
 
@@ -65,7 +65,7 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #111111; }
 ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #d97706; }
+::-webkit-scrollbar-thumb:hover { background: #22d3ee; }
 
 /* EKG path animation */
 .ekg-path {

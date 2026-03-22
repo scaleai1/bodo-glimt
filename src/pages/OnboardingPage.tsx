@@ -1,11 +1,10 @@
 import { useState, useRef } from 'react';
 import {
-  Globe, Check, ArrowRight, Loader2, Zap,
-  Palette, SkipForward, AlertCircle, ChevronRight,
+  Globe, Check, ArrowRight, Loader2, Sparkles,
+  Palette, SkipForward, AlertCircle,
   Upload, FileText, Activity,
 } from 'lucide-react';
 import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/BrandingService';
-import type { BrandConfig } from '../lib/BrandingService';
 import { scanBrand, saveBrand as saveBrandProfile } from '../lib/brandContext';
 import { saveUserConfig } from '../lib/userConfig';
 import Anthropic from '@anthropic-ai/sdk';
@@ -37,6 +36,25 @@ async function fetchPages(token: string): Promise<MetaPage[]> {
 
 // ── AI helper (for deep brand scan) ──────────────────────────────────────────
 
+async function readFileToText(f: File): Promise<string> {
+  const isExcel = /\.(xlsx|xls)$/i.test(f.name);
+  if (isExcel) {
+    const XLSX = await import('xlsx');
+    const buf  = await f.arrayBuffer();
+    const wb   = XLSX.read(buf, { type: 'array' });
+    return wb.SheetNames.map(name => {
+      const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name]);
+      return `Sheet: ${name}\n${csv}`;
+    }).join('\n\n');
+  }
+  return new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res((e.target?.result as string) ?? '');
+    r.onerror = rej;
+    r.readAsText(f);
+  });
+}
+
 async function callClaude(system: string, user: string): Promise<string> {
   const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
   if (!key) throw new Error('No AI key');
@@ -51,52 +69,29 @@ async function callClaude(system: string, user: string): Promise<string> {
   return b.type === 'text' ? b.text : '';
 }
 
-// ── Step Indicator ────────────────────────────────────────────────────────────
-
-const STEP_LABELS = ['Brand DNA', 'Meta Ads'];
-
-function StepIndicator({ current }: { current: 1 | 2 }) {
-  return (
-    <div className="flex items-center justify-center gap-1 mb-8">
-      {STEP_LABELS.map((label, i) => {
-        const n      = i + 1;
-        const done   = n < current;
-        const active = n === current;
-        return (
-          <div key={i} className="flex items-center gap-1">
-            <div className="flex flex-col items-center gap-1">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                done   ? 'bg-green-500 text-white' :
-                active ? 'bg-amber-400 text-black' :
-                         'bg-white/10 text-white/30'
-              }`}>
-                {done ? <Check size={12} /> : n}
-              </div>
-              <span className={`text-[10px] ${active ? 'text-white/60' : 'text-white/20'}`}>{label}</span>
-            </div>
-            {i < STEP_LABELS.length - 1 && (
-              <div className={`h-px w-14 mb-4 transition-all ${done ? 'bg-green-500/40' : 'bg-white/10'}`} />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Welcome Step ──────────────────────────────────────────────────────────────
 
-function WelcomeStep({ onStart }: { onStart: () => void }) {
+function WelcomeStep({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
   return (
     <div className="text-center space-y-8">
       {/* Logo */}
       <div className="flex items-center justify-center gap-3">
-        <div className="w-14 h-14 bg-amber-400 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-400/20">
-          <Zap size={30} className="text-black" />
+        <div style={{
+          width: 54, height: 54, borderRadius: 16, flexShrink: 0,
+          background: 'linear-gradient(135deg, #1a1200 0%, #2a1f00 100%)',
+          border: '1px solid rgba(240,180,41,0.35)',
+          boxShadow: '0 0 24px rgba(240,180,41,0.18)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="14" width="5" height="8" rx="1.5" fill="#F0B429" opacity="0.45"/>
+            <rect x="9.5" y="8" width="5" height="14" rx="1.5" fill="#F0B429" opacity="0.72"/>
+            <rect x="17" y="2" width="5" height="20" rx="1.5" fill="#F0B429"/>
+          </svg>
         </div>
         <div className="text-left">
           <div className="text-3xl font-black text-white tracking-tight leading-none">
-            Scale<span className="text-amber-400">.</span>ai
+            <span style={{ fontWeight: 900, letterSpacing: '-0.03em' }}>SCALE</span><span style={{ color: '#F0B429', fontWeight: 300 }}>AI</span>
           </div>
           <div className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5">Marketing Platform</div>
         </div>
@@ -104,9 +99,9 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
 
       <div className="space-y-3">
         <h1 className="text-4xl font-black text-white leading-[1.1]">
-          Your brand.<br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">
-            Supercharged by AI.
+          Your AI Marketing<br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">
+            Command Center.
           </span>
         </h1>
         <p className="text-white/50 text-base max-w-sm mx-auto leading-relaxed">
@@ -118,10 +113,10 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         {[
           { icon: Palette, title: 'Auto Brand DNA',  desc: 'Logo, colors & tone detected instantly' },
           { icon: Globe,   title: 'Meta Connected',  desc: 'Ad accounts linked in seconds'          },
-          { icon: Zap,     title: 'AI Campaigns',    desc: 'Start generating content immediately'   },
+          { icon: Sparkles, title: 'AI Campaigns',    desc: 'Start generating content immediately'   },
         ].map(({ icon: Icon, title, desc }) => (
           <div key={title} className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4 text-left">
-            <Icon size={18} className="text-amber-400 mb-2" />
+            <Icon size={18} className="text-yellow-400 mb-2" />
             <div className="text-white text-xs font-semibold mb-1">{title}</div>
             <div className="text-white/30 text-[11px] leading-snug">{desc}</div>
           </div>
@@ -130,9 +125,16 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
 
       <button
         onClick={onStart}
-        className="w-full py-4 bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 text-lg transition-all shadow-lg shadow-amber-400/20"
+        className="w-full py-4 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 text-lg transition-all shadow-lg shadow-yellow-400/20"
       >
         Get Started <ArrowRight size={20} />
+      </button>
+
+      <button
+        onClick={onSkip}
+        className="w-full py-2 text-white/25 hover:text-white/50 text-xs flex items-center justify-center gap-1.5 transition-colors"
+      >
+        <SkipForward size={12} /> Skip setup — go straight to dashboard
       </button>
 
       <FileAnalystSection />
@@ -140,36 +142,235 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
   );
 }
 
+// ── Insight Cards ─────────────────────────────────────────────────────────────
+
+function cleanText(s: string) { return s.replace(/\*\*/g, '').replace(/^#+\s*/, '').trim(); }
+function isValidBlock(s: string) {
+  const c = cleanText(s);
+  return c.length > 20 && !/^(here are|please provide|i (cannot|need|will)|to provide)/i.test(c);
+}
+
+const CARD_ACCENTS = [
+  { bg: 'rgba(240,180,41,0.08)',  border: 'rgba(240,180,41,0.25)', num: '#F0B429' },
+  { bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.25)', num: '#818cf8' },
+  { bg: 'rgba(34,197,94,0.08)',  border: 'rgba(34,197,94,0.25)',  num: '#4ade80' },
+  { bg: 'rgba(6,182,212,0.08)',  border: 'rgba(6,182,212,0.25)',  num: '#22d3ee' },
+];
+
+function InsightCards({ groups, onClose, onAddFile, onDropFile, loading }: {
+  groups: InsightGroup[];
+  onClose: () => void;
+  onAddFile: () => void;
+  onDropFile: (f: File) => void;
+  loading: boolean;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const totalCount = groups.reduce((n, g) => n + g.blocks.length, 0);
+  const subtitle = groups.map(g => g.fileName).join(' · ');
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      background: 'rgba(6,6,10,0.94)',
+      backdropFilter: 'blur(14px)',
+      display: 'flex', flexDirection: 'column',
+      padding: '0',
+    }}>
+      {/* Top bar */}
+      <div style={{
+        padding: '16px 28px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', alignItems: 'center', gap: 14,
+        background: 'rgba(240,180,41,0.04)',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          width: 38, height: 38, borderRadius: 11,
+          background: 'rgba(240,180,41,0.12)',
+          border: '1px solid rgba(240,180,41,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 20px rgba(240,180,41,0.18)',
+        }}>
+          <Activity size={18} style={{ color: '#F0B429' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+            AI Insights
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(240,180,41,0.7)', marginLeft: 10 }}>
+              {totalCount} findings
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subtitle}
+          </div>
+        </div>
+        {/* Close */}
+        <button onClick={onClose} style={{
+          width: 34, height: 34, borderRadius: 9,
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: 'rgba(255,255,255,0.45)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, lineHeight: 1, flexShrink: 0,
+        }}>×</button>
+      </div>
+
+      {/* Scrollable cards area */}
+      <div style={{
+        flex: 1, overflowY: 'auto', padding: '24px 28px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+        gap: 16, alignContent: 'start',
+      }}>
+        {groups.flatMap((g, gi) =>
+          g.blocks.filter(isValidBlock).map((block, bi) => {
+            const globalIdx = groups.slice(0, gi).reduce((n, x) => n + x.blocks.filter(isValidBlock).length, 0) + bi;
+            const accent = CARD_ACCENTS[globalIdx % CARD_ACCENTS.length];
+            const clean = cleanText(block);
+            const colonIdx = clean.indexOf(':');
+            const hasTitle = colonIdx > 0 && colonIdx < 70;
+            const title = hasTitle ? cleanText(clean.slice(0, colonIdx)) : null;
+            const body  = hasTitle ? cleanText(clean.slice(colonIdx + 1)) : clean;
+
+            return (
+              <div key={`${gi}-${bi}`} style={{
+                background: accent.bg,
+                border: `1px solid ${accent.border}`,
+                borderRadius: 18,
+                padding: '22px 24px',
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                    background: 'rgba(0,0,0,0.4)',
+                    border: `1px solid ${accent.border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: accent.num }}>{globalIdx + 1}</span>
+                  </div>
+                  {title && (
+                    <span style={{ fontSize: 15, fontWeight: 800, color: accent.num, lineHeight: 1.25 }}>
+                      {title}
+                    </span>
+                  )}
+                </div>
+                <p style={{
+                  fontSize: 15, lineHeight: 1.7,
+                  color: 'rgba(255,255,255,0.75)',
+                  margin: 0, paddingLeft: 44,
+                }}>
+                  {body}
+                </p>
+                {groups.length > 1 && (
+                  <div style={{ paddingLeft: 44, fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
+                    {g.fileName}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ── Upload panel — always visible at bottom ── */}
+      <div style={{
+        flexShrink: 0,
+        padding: '14px 28px 20px',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(0,0,0,0.3)',
+      }}>
+        <div
+          onClick={loading ? undefined : onAddFile}
+          onDragOver={e => { if (!loading) { e.preventDefault(); setDragOver(true); } }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => {
+            e.preventDefault(); setDragOver(false);
+            if (loading) return;
+            const f = e.dataTransfer.files?.[0];
+            if (f) onDropFile(f);
+          }}
+          style={{
+            border: `2px dashed ${dragOver ? 'rgba(240,180,41,0.65)' : 'rgba(240,180,41,0.22)'}`,
+            background: dragOver
+              ? 'rgba(240,180,41,0.07)'
+              : 'linear-gradient(135deg, rgba(240,180,41,0.04) 0%, rgba(255,255,255,0.02) 100%)',
+            borderRadius: 16, padding: '16px 24px', cursor: loading ? 'default' : 'pointer',
+            transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 20,
+            opacity: loading ? 0.5 : 1,
+          }}
+        >
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+            background: dragOver ? 'rgba(240,180,41,0.18)' : 'rgba(240,180,41,0.1)',
+            border: `1px solid ${dragOver ? 'rgba(240,180,41,0.5)' : 'rgba(240,180,41,0.25)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.2s',
+            boxShadow: dragOver ? '0 0 20px rgba(240,180,41,0.2)' : 'none',
+          }}>
+            <Upload size={20} style={{ color: '#F0B429' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: dragOver ? '#F0B429' : 'rgba(255,255,255,0.7)', marginBottom: 3, transition: 'color 0.2s' }}>
+              {loading ? 'Analyzing…' : dragOver ? 'Drop to analyze' : 'Add another file'}
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+              Drag & drop or click · CSV, Excel, PDF, TXT, JSON
+            </div>
+          </div>
+          <div style={{
+            padding: '8px 16px', borderRadius: 10, flexShrink: 0,
+            background: 'rgba(240,180,41,0.12)', border: '1px solid rgba(240,180,41,0.3)',
+            color: '#F0B429', fontSize: 12, fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <FileText size={13} /> Browse
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 // ── File Analyst Section ──────────────────────────────────────────────────────
 
+interface InsightGroup { fileName: string; blocks: string[]; }
+
+function parseBlocks(text: string): string[] {
+  const byNum = text.split(/\n(?=\d+[\.\)]\s)/).map(s => s.replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean);
+  return byNum.length >= 2 ? byNum : text.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+}
+
 function FileAnalystSection() {
-  const [file,     setFile]     = useState<File | null>(null);
-  const [analysis, setAnalysis] = useState('');
+  const [groups,   setGroups]   = useState<InsightGroup[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [err,      setErr]      = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [open,     setOpen]     = useState(false);
+  const inputRef  = useRef<HTMLInputElement>(null);
 
   async function analyzeFile(f: File) {
-    setFile(f);
-    setAnalysis('');
     setErr('');
     setLoading(true);
     try {
       const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
       if (!key) throw new Error('No AI key configured');
-      const text = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = e => resolve((e.target?.result as string) ?? '');
-        reader.onerror = reject;
-        reader.readAsText(f);
-      });
+      const text = await readFileToText(f);
       const result = await callClaude(
-        'You are a marketing data analyst. Analyze the uploaded file and provide 3–5 clear, actionable insights. Be concise. Focus on ad performance and business growth.',
-        `File: ${f.name}\n\n${text.slice(0, 8000)}`,
+        'You are an elite marketing analyst. Extract 6–8 sharp, specific insights from the data. Numbered list, each: "N. Bold Title: One direct sentence (max 18 words), no fluff." No intro, no outro.',
+        `File: ${f.name}\n\n${text.slice(0, 10000)}`,
       );
-      setAnalysis(result);
+      setGroups(prev => [...prev, { fileName: f.name, blocks: parseBlocks(result) }]);
+      setOpen(true);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Analysis failed');
+      const raw = e instanceof Error ? e.message : String(e);
+      if (raw.includes('credit balance') || raw.includes('credit_balance') || raw.includes('billing')) {
+        setErr('__billing__');
+      } else if (raw.includes('No AI key')) {
+        setErr('No Anthropic API key configured.');
+      } else {
+        setErr('Analysis failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -187,8 +388,8 @@ function FileAnalystSection() {
       {/* Card */}
       <div
         style={{
-          background: 'linear-gradient(135deg, rgba(251,191,36,0.06) 0%, rgba(251,191,36,0.02) 50%, rgba(255,255,255,0.02) 100%)',
-          border: '1px solid rgba(251,191,36,0.12)',
+          background: 'linear-gradient(135deg, rgba(240,180,41,0.06) 0%, rgba(240,180,41,0.02) 50%, rgba(255,255,255,0.02) 100%)',
+          border: '1px solid rgba(240,180,41,0.12)',
           borderRadius: 16,
           padding: '20px',
           position: 'relative',
@@ -199,7 +400,7 @@ function FileAnalystSection() {
         <div style={{
           position: 'absolute', top: -40, right: -40,
           width: 120, height: 120, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(251,191,36,0.08) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(240,180,41,0.08) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
@@ -207,14 +408,14 @@ function FileAnalystSection() {
         <div className="flex items-center gap-3 mb-3">
           <div style={{
             width: 36, height: 36,
-            background: 'rgba(251,191,36,0.12)',
-            border: '1px solid rgba(251,191,36,0.25)',
+            background: 'rgba(240,180,41,0.12)',
+            border: '1px solid rgba(240,180,41,0.25)',
             borderRadius: 10,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
-            boxShadow: '0 0 16px rgba(251,191,36,0.12)',
+            boxShadow: '0 0 16px rgba(240,180,41,0.12)',
           }}>
-            <Activity size={16} className="text-amber-400" />
+            <Activity size={16} className="text-yellow-400" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-white font-bold text-sm leading-tight">AI File Analyst</div>
@@ -226,9 +427,9 @@ function FileAnalystSection() {
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: 'rgba(251,191,36,0.7)',
-              background: 'rgba(251,191,36,0.08)',
-              border: '1px solid rgba(251,191,36,0.18)',
+              color: 'rgba(240,180,41,0.7)',
+              background: 'rgba(240,180,41,0.08)',
+              border: '1px solid rgba(240,180,41,0.18)',
               borderRadius: 20, padding: '2px 8px',
             }}>
               Free
@@ -255,7 +456,7 @@ function FileAnalystSection() {
         <div
           onClick={() => inputRef.current?.click()}
           style={{
-            border: '1px dashed rgba(251,191,36,0.2)',
+            border: '1px dashed rgba(240,180,41,0.2)',
             borderRadius: 10,
             padding: '14px 16px',
             cursor: 'pointer',
@@ -264,12 +465,28 @@ function FileAnalystSection() {
             background: 'rgba(0,0,0,0.2)',
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(251,191,36,0.45)';
-            (e.currentTarget as HTMLElement).style.background = 'rgba(251,191,36,0.04)';
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(240,180,41,0.45)';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(240,180,41,0.04)';
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(251,191,36,0.2)';
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(240,180,41,0.2)';
             (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.2)';
+          }}
+          onDragOver={e => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(240,180,41,0.55)';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(240,180,41,0.06)';
+          }}
+          onDragLeave={e => {
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(240,180,41,0.2)';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.2)';
+          }}
+          onDrop={e => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(240,180,41,0.2)';
+            (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.2)';
+            const f = e.dataTransfer.files?.[0];
+            if (f) analyzeFile(f);
           }}
         >
           <input
@@ -281,18 +498,18 @@ function FileAnalystSection() {
           />
           {loading ? (
             <div className="flex items-center justify-center gap-2.5">
-              <Loader2 size={15} className="animate-spin text-amber-400 shrink-0" />
-              <span className="text-white/40 text-xs">Analyzing {file?.name}…</span>
+              <Loader2 size={15} className="animate-spin text-yellow-400 shrink-0" />
+              <span className="text-white/40 text-xs">Analyzing…</span>
             </div>
-          ) : file ? (
+          ) : groups.length > 0 ? (
             <div className="flex items-center justify-center gap-2">
-              <FileText size={13} className="text-amber-400 shrink-0" />
-              <span className="text-white/60 text-xs truncate">{file.name}</span>
-              <span className="text-white/25 text-xs shrink-0">· change</span>
+              <FileText size={13} className="text-yellow-400 shrink-0" />
+              <span className="text-white/60 text-xs truncate">{groups[groups.length - 1].fileName}</span>
+              <span className="text-white/25 text-xs shrink-0">· add more</span>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2">
-              <Upload size={13} style={{ color: 'rgba(251,191,36,0.4)' }} />
+              <Upload size={13} style={{ color: 'rgba(240,180,41,0.4)' }} />
               <span className="text-white/35 text-xs">Drop file or click — CSV, Excel, PDF, TXT</span>
             </div>
           )}
@@ -300,405 +517,193 @@ function FileAnalystSection() {
 
         {/* Error */}
         {err && (
-          <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/15 rounded-lg p-3 mt-3">
-            <AlertCircle size={12} className="shrink-0" /> {err}
-          </div>
+          err === '__billing__' ? (
+            <div className="mt-3 bg-red-500/5 border border-red-500/20 rounded-lg p-3 space-y-1.5">
+              <div className="flex items-center gap-2 text-red-400 text-xs font-semibold">
+                <AlertCircle size={12} className="shrink-0" /> API credit balance is too low
+              </div>
+              <p className="text-white/35 text-[11px] leading-relaxed pl-[20px]">
+                Your Anthropic API key has run out of credits.{' '}
+                <a
+                  href="https://console.anthropic.com/settings/billing"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-yellow-400/80 hover:text-yellow-400 underline underline-offset-2 transition-colors"
+                >
+                  Top up here →
+                </a>
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/15 rounded-lg p-3 mt-3">
+              <AlertCircle size={12} className="shrink-0" /> {err}
+            </div>
+          )
         )}
 
-        {/* Results */}
-        {analysis && (
-          <div className="mt-3 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(251,191,36,0.15)' }}>
-            <div className="flex items-center gap-1.5 px-3 py-2" style={{ background: 'rgba(251,191,36,0.07)', borderBottom: '1px solid rgba(251,191,36,0.1)' }}>
-              <Activity size={10} className="text-amber-400" />
-              <span className="text-amber-400 text-[10px] font-bold uppercase tracking-wider">AI Insights</span>
-            </div>
-            <div className="p-3" style={{ background: 'rgba(0,0,0,0.25)' }}>
-              <p className="text-white/60 text-xs leading-relaxed whitespace-pre-wrap">{analysis}</p>
-            </div>
-          </div>
+        {/* View insights button */}
+        {groups.length > 0 && !open && (
+          <button onClick={() => setOpen(true)} style={{
+            marginTop: 10, width: '100%', padding: '9px 0',
+            background: 'rgba(240,180,41,0.1)', border: '1px solid rgba(240,180,41,0.25)',
+            borderRadius: 10, color: '#F0B429', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>
+            View {groups.reduce((n, g) => n + g.blocks.length, 0)} Insights →
+          </button>
         )}
+
+        {/* Overlay */}
+        {open && <InsightCards groups={groups} onClose={() => setOpen(false)} onAddFile={() => inputRef.current?.click()} onDropFile={f => analyzeFile(f)} loading={loading} />}
       </div>
     </div>
   );
 }
 
-// ── Brand Step ────────────────────────────────────────────────────────────────
+// ── Combined Setup Step ────────────────────────────────────────────────────────
 
-interface BrandStepState {
-  url:       string;
-  detecting: boolean;
-  deepScan:  boolean;
-  config:    BrandConfig | null;
-  name:      string;
-  industry:  string;
-  tone:      string;
-  keywords:  string[];
-  error:     string;
-}
+function SetupStep({ onComplete }: { onComplete: () => void }) {
+  // Brand state
+  const [url,        setUrl]        = useState('');
+  const [detecting,  setDetecting]  = useState(false);
+  const [brandDone,  setBrandDone]  = useState(false);
+  const [brandName,  setBrandName]  = useState('');
+  const [brandError, setBrandError] = useState('');
 
-function BrandStep({ onContinue, onSkip }: {
-  onContinue: (cfg: BrandConfig, name: string, industry: string, tone: string, keywords: string[]) => void;
-  onSkip:     () => void;
-}) {
-  const [s, setS] = useState<BrandStepState>({
-    url: '', detecting: false, deepScan: false,
-    config: null, name: '', industry: '', tone: '', keywords: [], error: '',
-  });
+  // Meta state
+  const [token,           setToken]           = useState('');
+  const [metaLoading,     setMetaLoading]     = useState(false);
+  const [metaConnected,   setMetaConnected]   = useState(false);
+  const [accounts,        setAccounts]        = useState<MetaAccount[]>([]);
+  const [pages,           setPages]           = useState<MetaPage[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState('');
+  const [selectedPage,    setSelectedPage]    = useState('');
+  const [metaError,       setMetaError]       = useState('');
 
-  async function detect() {
-    const raw = s.url.trim();
+  async function detectBrand() {
+    const raw = url.trim();
     if (!raw) return;
     const full = raw.startsWith('http') ? raw : `https://${raw}`;
-    setS(prev => ({ ...prev, detecting: true, error: '', config: null, name: '', industry: '', tone: '', keywords: [] }));
-
+    setDetecting(true); setBrandError('');
     try {
-      // Fast: favicon + dominant color
       const cfg = await resolveBrand(full);
-      setS(prev => ({ ...prev, detecting: false, config: cfg, name: cfg.name }));
-
-      // Background: deep AI scan for tone / industry / keywords
+      const finalName = cfg.name;
+      setBrandName(finalName);
+      applyBrand(cfg); saveBrandConfig(cfg);
+      saveUserConfig({ websiteUrl: cfg.domain, brandName: finalName, logoUrl: cfg.logoUrl, primaryColor: cfg.primary });
+      setBrandDone(true);
       const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
       if (key) {
-        setS(prev => ({ ...prev, deepScan: true }));
         try {
           const profile = await scanBrand(full, callClaude);
           saveBrandProfile(profile);
-          setS(prev => ({
-            ...prev, deepScan: false,
-            name:     prev.name || profile.name,
-            industry: profile.industry,
-            tone:     profile.tone,
-            keywords: profile.keywords,
-          }));
-        } catch {
-          setS(prev => ({ ...prev, deepScan: false }));
-        }
+          saveUserConfig({ industry: profile.industry, tone: profile.tone, keywords: profile.keywords });
+        } catch { /* silent */ }
       }
     } catch {
-      setS(prev => ({ ...prev, detecting: false, error: 'Could not detect brand. Check the URL and try again.' }));
-    }
+      setBrandError('Could not detect brand. Check the URL and try again.');
+    } finally { setDetecting(false); }
   }
 
-  function handleContinue() {
-    if (!s.config) return;
-    const finalName = s.name.trim() || s.config.name;
-    onContinue({ ...s.config, name: finalName }, finalName, s.industry, s.tone, s.keywords);
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-black text-white">Brand DNA</h2>
-        <p className="text-white/40 text-sm mt-1">
-          Enter your website URL — we'll detect your colors, logo, and tone automatically.
-        </p>
-      </div>
-
-      {/* URL input row */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
-          <input
-            type="text"
-            value={s.url}
-            onChange={e => setS(prev => ({ ...prev, url: e.target.value }))}
-            onKeyDown={e => e.key === 'Enter' && !s.detecting && detect()}
-            placeholder="yoursite.com"
-            className="w-full pl-8 pr-3 py-3 bg-white/[0.04] border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:border-amber-400/40"
-          />
-        </div>
-        <button
-          onClick={detect}
-          disabled={s.detecting || !s.url.trim()}
-          className="px-4 py-3 bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-black font-bold rounded-xl flex items-center gap-1.5 text-sm transition-colors whitespace-nowrap"
-        >
-          {s.detecting ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-          {s.detecting ? 'Detecting…' : 'Detect'}
-        </button>
-      </div>
-
-      {s.error && (
-        <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/20 rounded-lg p-3">
-          <AlertCircle size={12} className="shrink-0" /> {s.error}
-        </div>
-      )}
-
-      <FileAnalystSection />
-
-      {/* Brand Preview */}
-      {s.config && (
-        <div className="bg-white/[0.04] border border-white/10 rounded-xl p-5 space-y-4">
-          <div className="flex items-center gap-3">
-            <img
-              src={s.config.logoUrl}
-              alt=""
-              className="w-12 h-12 rounded-lg object-contain bg-white/5 p-1 border border-white/10"
-              onError={e => ((e.target as HTMLImageElement).style.opacity = '0')}
-            />
-            <div className="flex-1 min-w-0">
-              <input
-                value={s.name}
-                onChange={e => setS(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full bg-transparent text-white font-bold text-lg focus:outline-none border-b border-transparent focus:border-amber-400/40 pb-0.5"
-                placeholder="Brand name"
-              />
-              {s.industry && (
-                <div className="text-white/30 text-xs mt-0.5">{s.industry}</div>
-              )}
-            </div>
-            <div className="flex gap-1.5 shrink-0">
-              <div
-                className="w-7 h-7 rounded-full border border-white/20"
-                style={{ backgroundColor: s.config.primary }}
-                title={s.config.primary}
-              />
-              <div
-                className="w-7 h-7 rounded-full border border-white/20"
-                style={{ backgroundColor: s.config.secondary }}
-                title={s.config.secondary}
-              />
-            </div>
-          </div>
-
-          {(s.deepScan || s.tone || s.keywords.length > 0) && (
-            <div className="flex flex-wrap gap-1.5">
-              {s.deepScan && (
-                <span className="text-[10px] px-2 py-0.5 bg-white/5 text-white/30 rounded-full border border-white/10 flex items-center gap-1">
-                  <Loader2 size={8} className="animate-spin" /> Analyzing deeper…
-                </span>
-              )}
-              {s.tone && (
-                <span className="text-[10px] px-2 py-0.5 bg-amber-400/10 text-amber-400 rounded-full border border-amber-400/20">
-                  {s.tone}
-                </span>
-              )}
-              {s.keywords.map(k => (
-                <span key={k} className="text-[10px] px-2 py-0.5 bg-white/[0.04] text-white/40 rounded-full border border-white/10">
-                  {k}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="text-[10px] text-white/20 flex items-center gap-1">
-            <Check size={8} className="text-green-400" /> Detected from {s.url}
-          </div>
-        </div>
-      )}
-
-      <button
-        onClick={handleContinue}
-        disabled={!s.config || s.detecting}
-        className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 disabled:opacity-30 disabled:cursor-not-allowed text-black font-black rounded-xl flex items-center justify-center gap-2 transition-colors"
-      >
-        Continue <ChevronRight size={16} />
-      </button>
-
-      <button
-        onClick={onSkip}
-        className="w-full py-2 text-white/25 hover:text-white/50 text-xs flex items-center justify-center gap-1.5 transition-colors"
-      >
-        <SkipForward size={12} /> Skip — I'll set up my brand later
-      </button>
-    </div>
-  );
-}
-
-// ── Meta Step ─────────────────────────────────────────────────────────────────
-
-interface MetaStepState {
-  token:           string;
-  loading:         boolean;
-  accounts:        MetaAccount[];
-  pages:           MetaPage[];
-  selectedAccount: string;
-  selectedPage:    string;
-  error:           string;
-}
-
-function MetaStep({ onContinue, onSkip }: {
-  onContinue: (token: string, accountId: string, pageId: string) => void;
-  onSkip:     () => void;
-}) {
-  const [s, setS] = useState<MetaStepState>({
-    token: '', loading: false, accounts: [], pages: [],
-    selectedAccount: '', selectedPage: '', error: '',
-  });
-
-  async function connect() {
-    const token = s.token.trim();
-    if (!token) return;
-    setS(prev => ({ ...prev, loading: true, error: '' }));
+  async function connectMeta() {
+    const t = token.trim();
+    if (!t) return;
+    setMetaLoading(true); setMetaError('');
     try {
-      const [accounts, pages] = await Promise.all([
-        fetchAdAccounts(token),
-        fetchPages(token),
-      ]);
-      setS(prev => ({
-        ...prev, loading: false, accounts, pages,
-        selectedAccount: accounts[0]?.id ?? '',
-        selectedPage:    pages[0]?.id    ?? '',
-      }));
+      const [accs, pgs] = await Promise.all([fetchAdAccounts(t), fetchPages(t)]);
+      setAccounts(accs); setPages(pgs);
+      setSelectedAccount(accs[0]?.id ?? ''); setSelectedPage(pgs[0]?.id ?? '');
+      setMetaConnected(true);
+      saveUserConfig({ metaAccessToken: t, metaAdAccountId: accs[0]?.id ?? '', metaFacebookPageId: pgs[0]?.id ?? '' });
     } catch {
-      setS(prev => ({ ...prev, loading: false, error: 'Connection failed. Check your token and try again.' }));
-    }
+      setMetaError('Connection failed. Check your token and try again.');
+    } finally { setMetaLoading(false); }
   }
 
-  const connected = s.accounts.length > 0 || s.pages.length > 0;
+  function handleDone() {
+    saveUserConfig({ completed: true });
+    onComplete();
+  }
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-2xl font-black text-white">Connect Meta Ads</h2>
-        <p className="text-white/40 text-sm mt-1">
-          Link your Facebook & Instagram ad accounts to manage campaigns from here.
-        </p>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-black text-white">Quick Setup</h2>
+        <span className="text-[10px] text-white/25 uppercase tracking-widest font-semibold">All optional</span>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-xs text-white/40 font-medium">Meta Business Access Token</label>
-        <textarea
-          value={s.token}
-          onChange={e => setS(prev => ({ ...prev, token: e.target.value, error: '' }))}
-          placeholder="Paste your long-lived access token here…"
-          rows={3}
-          className="w-full px-4 py-3 bg-white/[0.04] border border-white/10 rounded-xl text-white text-xs font-mono placeholder-white/20 focus:outline-none focus:border-amber-400/40 resize-none"
-        />
-        <p className="text-[11px] text-white/25 leading-relaxed">
-          Get your token from{' '}
-          <span className="text-white/45">Meta Business Suite → Settings → System Users → Generate Token</span>
-        </p>
-      </div>
-
-      {!connected && (
-        <button
-          onClick={connect}
-          disabled={s.loading || !s.token.trim()}
-          className="w-full py-3 bg-[#1877F2] hover:bg-[#1565d8] active:scale-[0.98] disabled:opacity-40 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
-        >
-          {s.loading ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
-          {s.loading ? 'Connecting…' : 'Connect to Meta'}
-        </button>
-      )}
-
-      {s.error && (
-        <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/20 rounded-lg p-3">
-          <AlertCircle size={12} className="shrink-0" /> {s.error}
+      {/* ── Brand section ── */}
+      <div className="border border-white/[0.07] rounded-xl p-4 space-y-3 bg-white/[0.02]">
+        <div className="flex items-center gap-2">
+          <Globe size={13} className="text-yellow-400" />
+          <span className="text-sm font-bold text-white">Brand DNA</span>
+          {brandDone && <span className="ml-auto text-[10px] text-green-400 font-semibold flex items-center gap-1"><Check size={10}/> Detected</span>}
         </div>
-      )}
-
-      {connected && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-green-400 text-sm font-medium">
-            <div className="w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center">
-              <Check size={10} />
-            </div>
-            Connected — {s.accounts.length} ad account{s.accounts.length !== 1 ? 's' : ''} found
-          </div>
-
-          {s.accounts.length > 1 && (
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/40">Ad Account</label>
-              <select
-                value={s.selectedAccount}
-                onChange={e => setS(prev => ({ ...prev, selectedAccount: e.target.value }))}
-                className="w-full px-4 py-3 bg-white/[0.04] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-400/40"
-              >
-                {s.accounts.map(acc => (
-                  <option key={acc.id} value={acc.id} className="bg-[#0c0d12]">
-                    {acc.name} — {acc.account_id}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {s.pages.length > 0 && (
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/40">Facebook Page</label>
-              <select
-                value={s.selectedPage}
-                onChange={e => setS(prev => ({ ...prev, selectedPage: e.target.value }))}
-                className="w-full px-4 py-3 bg-white/[0.04] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-amber-400/40"
-              >
-                {s.pages.map(p => (
-                  <option key={p.id} value={p.id} className="bg-[#0c0d12]">
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <button
-            onClick={() => onContinue(s.token.trim(), s.selectedAccount, s.selectedPage)}
-            className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all"
-          >
-            Finish Setup <ArrowRight size={16} />
+        <div className="flex gap-2">
+          <input
+            value={url} onChange={e => setUrl(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') detectBrand(); }}
+            placeholder="yourstore.com"
+            className="flex-1 px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm placeholder-white/20 focus:outline-none focus:border-yellow-400/40"
+          />
+          <button onClick={detectBrand} disabled={detecting || !url.trim()}
+            className="px-3 py-2.5 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 text-black font-bold rounded-lg flex items-center gap-1.5 text-sm transition-colors whitespace-nowrap">
+            {detecting ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+            {detecting ? 'Detecting…' : 'Detect'}
           </button>
         </div>
-      )}
+        {brandDone && <p className="text-xs text-green-400/70">Brand "{brandName}" detected and applied ✓</p>}
+        {brandError && <p className="text-xs text-red-400">{brandError}</p>}
+      </div>
 
-      <button
-        onClick={onSkip}
-        className="w-full py-2 text-white/25 hover:text-white/50 text-xs flex items-center justify-center gap-1.5 transition-colors"
-      >
-        <SkipForward size={12} /> Skip Meta connection — I'll connect later
-      </button>
-    </div>
-  );
-}
+      {/* ── Divider ── */}
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-white/[0.05]" />
+        <span className="text-[10px] text-white/20 uppercase tracking-widest">or / and</span>
+        <div className="h-px flex-1 bg-white/[0.05]" />
+      </div>
 
-// ── Done Step ─────────────────────────────────────────────────────────────────
-
-function DoneStep({ brandName, metaConnected, onDashboard }: {
-  brandName:     string;
-  metaConnected: boolean;
-  onDashboard:   () => void;
-}) {
-  return (
-    <div className="text-center space-y-6">
-      <div className="flex justify-center">
-        <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border-2 border-green-500/20">
-          <Check size={36} className="text-green-400" strokeWidth={3} />
+      {/* ── Meta section ── */}
+      <div className="border border-white/[0.07] rounded-xl p-4 space-y-3 bg-white/[0.02]">
+        <div className="flex items-center gap-2">
+          <Globe size={13} className="text-[#1877F2]" />
+          <span className="text-sm font-bold text-white">Connect Meta Ads</span>
+          {metaConnected && <span className="ml-auto text-[10px] text-green-400 font-semibold flex items-center gap-1"><Check size={10}/> {accounts.length} account{accounts.length !== 1 ? 's' : ''}</span>}
         </div>
-      </div>
-
-      <div>
-        <h2 className="text-3xl font-black text-white">All Done!</h2>
-        <p className="text-white/40 text-sm mt-2">Your Scale.ai workspace is ready.</p>
-      </div>
-
-      <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4 text-left space-y-2.5">
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center shrink-0">
-            <Check size={10} className="text-green-400" />
+        {!metaConnected ? (
+          <div className="flex gap-2">
+            <input
+              value={token} onChange={e => setToken(e.target.value)}
+              placeholder="Paste your Meta access token…"
+              className="flex-1 px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-lg text-white text-xs font-mono placeholder-white/20 focus:outline-none focus:border-yellow-400/40"
+            />
+            <button onClick={connectMeta} disabled={metaLoading || !token.trim()}
+              className="px-3 py-2.5 bg-[#1877F2] hover:bg-[#1565d8] disabled:opacity-40 text-white font-bold rounded-lg flex items-center gap-1.5 text-sm transition-colors whitespace-nowrap">
+              {metaLoading ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
+              {metaLoading ? 'Connecting…' : 'Connect'}
+            </button>
           </div>
-          <span className="text-white/60 text-sm">
-            Brand DNA: <span className="text-white font-semibold">{brandName || 'Your Brand'}</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-            metaConnected ? 'bg-green-500/20' : 'bg-amber-400/10'
-          }`}>
-            {metaConnected
-              ? <Check size={10} className="text-green-400" />
-              : <AlertCircle size={10} className="text-amber-400" />}
+        ) : (
+          <div className="space-y-2">
+            {accounts.length > 1 && (
+              <select value={selectedAccount} onChange={e => { setSelectedAccount(e.target.value); saveUserConfig({ metaAdAccountId: e.target.value }); }}
+                className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none">
+                {accounts.map(a => <option key={a.id} value={a.id} className="bg-[#0c0d12]">{a.name}</option>)}
+              </select>
+            )}
+            {pages.length > 1 && (
+              <select value={selectedPage} onChange={e => { setSelectedPage(e.target.value); saveUserConfig({ metaFacebookPageId: e.target.value }); }}
+                className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none">
+                {pages.map(p => <option key={p.id} value={p.id} className="bg-[#0c0d12]">{p.name}</option>)}
+              </select>
+            )}
           </div>
-          <span className="text-sm">
-            {metaConnected
-              ? <span className="text-white/60">Meta Ads connected</span>
-              : <span className="text-white/30">Meta Ads — connect later in Settings</span>}
-          </span>
-        </div>
+        )}
+        {metaError && <p className="text-xs text-red-400">{metaError}</p>}
       </div>
 
-      <button
-        onClick={onDashboard}
-        className="w-full py-4 bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 text-lg transition-all shadow-lg shadow-amber-400/20"
-      >
-        Go to Dashboard <ArrowRight size={20} />
+      <button onClick={handleDone}
+        className="w-full py-3.5 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all">
+        Go to Dashboard <ArrowRight size={16} />
       </button>
     </div>
   );
@@ -706,74 +711,24 @@ function DoneStep({ brandName, metaConnected, onDashboard }: {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-type Step = 0 | 1 | 2 | 3; // welcome | brand | meta | done
-
 interface OnboardingPageProps {
   onComplete: () => void;
 }
 
 export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
-  const [step, setStep] = useState<Step>(0);
-  const [brandName, setBrandName] = useState('');
-  const [metaConnected, setMetaConnected] = useState(false);
+  const [step, setStep] = useState<0 | 1>(0);
 
-  function handleBrandContinue(
-    cfg:      BrandConfig,
-    name:     string,
-    industry: string,
-    tone:     string,
-    keywords: string[],
-  ) {
-    const finalName = name || cfg.name;
-    setBrandName(finalName);
-    const finalCfg = { ...cfg, name: finalName };
-    applyBrand(finalCfg);
-    saveBrandConfig(finalCfg);
-    saveUserConfig({
-      websiteUrl:     cfg.domain,
-      brandName:      finalName,
-      logoUrl:        cfg.logoUrl,
-      primaryColor:   cfg.primary,
-      secondaryColor: cfg.secondary,
-      industry,
-      tone,
-      keywords,
-    });
-    setStep(2);
-  }
-
-  function handleMetaContinue(token: string, accountId: string, pageId: string) {
-    setMetaConnected(true);
-    saveUserConfig({
-      metaAccessToken:    token,
-      metaAdAccountId:    accountId,
-      metaFacebookPageId: pageId,
-      completed:          true,
-    });
-    setStep(3);
-  }
-
-  function handleMetaSkip() {
+  function handleSkip() {
     saveUserConfig({ completed: true });
-    setStep(3);
+    onComplete();
   }
 
   return (
     <div className="min-h-screen bg-[#06060a] flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
-        {(step === 1 || step === 2) && <StepIndicator current={step as 1 | 2} />}
-
         <div className="bg-[#0c0d12] border border-white/[0.06] rounded-2xl p-8 shadow-2xl">
-          {step === 0 && <WelcomeStep onStart={() => setStep(1)} />}
-          {step === 1 && <BrandStep onContinue={handleBrandContinue} onSkip={() => setStep(2)} />}
-          {step === 2 && <MetaStep onContinue={handleMetaContinue} onSkip={handleMetaSkip} />}
-          {step === 3 && (
-            <DoneStep
-              brandName={brandName}
-              metaConnected={metaConnected}
-              onDashboard={onComplete}
-            />
-          )}
+          {step === 0 && <WelcomeStep onStart={() => setStep(1)} onSkip={handleSkip} />}
+          {step === 1 && <SetupStep onComplete={onComplete} />}
         </div>
       </div>
     </div>

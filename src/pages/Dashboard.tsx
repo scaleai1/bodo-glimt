@@ -130,27 +130,30 @@ const AGENT_CARDS = [
 
 type AgentCarouselId = (typeof AGENT_CARDS)[number]['id'];
 
+// ─── Agent Carousel (below) ────────────────────────────────────────────────────
+
+
 const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ onOpen }) => {
   const [hovered, setHovered] = React.useState<number | null>(null);
 
   return (
-    <section style={{ padding: '8px 0 24px' }}>
+    <section style={{ padding: '20px 24px 0', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
 
       {/* Hero header */}
-      <div style={{ textAlign: 'center', marginBottom: 36 }}>
+      <div style={{ textAlign: 'center', marginBottom: 18 }}>
         <h1 style={{
-          color: '#fff', fontSize: 30, fontWeight: 900, letterSpacing: '-0.025em',
-          lineHeight: 1.12, fontFamily: 'var(--font-display)', margin: '0 0 12px',
+          color: '#fff', fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em',
+          lineHeight: 1.1, fontFamily: 'var(--font-display)', margin: '0 0 6px',
         }}>
           Your AI Marketing Command Center
         </h1>
-        <p style={{ color: '#6b7280', fontSize: 13, maxWidth: 440, margin: '0 auto', lineHeight: 1.6 }}>
+        <p style={{ color: '#6b7280', fontSize: 12, maxWidth: 380, margin: '0 auto', lineHeight: 1.5 }}>
           Three specialized agents working in perfect sync to scale your revenue and eliminate waste.
         </p>
       </div>
 
       {/* Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, flex: 1, minHeight: 0 }}>
         {AGENT_CARDS.map((card, i) => {
           const { Icon, name, accent, tagline, description, capabilities } = card;
           const isHov = hovered === i;
@@ -163,10 +166,9 @@ const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ on
               style={{
                 position:      'relative',
                 overflow:      'hidden',
-                borderRadius:  16,
-                padding:       '30px 26px 26px',
+                borderRadius:  14,
+                padding:       '22px 20px 18px',
                 cursor:        'pointer',
-                minHeight:     340,
                 display:       'flex',
                 flexDirection: 'column',
                 background:    `linear-gradient(145deg, color-mix(in srgb, ${accent} 10%, #111827) 0%, color-mix(in srgb, ${accent} 4%, #0d1117) 100%)`,
@@ -198,34 +200,34 @@ const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ on
 
               {/* Agent number badge */}
               <div style={{
-                position: 'absolute', top: 22, right: 22,
-                width: 24, height: 24, borderRadius: '50%',
+                position: 'absolute', top: 16, right: 16,
+                width: 22, height: 22, borderRadius: '50%',
                 background: `color-mix(in srgb, ${accent} 12%, transparent)`,
                 border: `1px solid color-mix(in srgb, ${accent} 28%, transparent)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 10, fontWeight: 900, color: accent, fontFamily: 'monospace',
+                fontSize: 9, fontWeight: 900, color: accent, fontFamily: 'monospace',
               }}>
                 0{i + 1}
               </div>
 
               {/* Icon box */}
               <div style={{
-                width: 54, height: 54, borderRadius: 14, flexShrink: 0,
+                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: `color-mix(in srgb, ${accent} 14%, transparent)`,
                 border: `1px solid color-mix(in srgb, ${accent} 28%, transparent)`,
-                marginBottom: 18,
-                boxShadow: isHov ? `0 0 20px color-mix(in srgb, ${accent} 22%, transparent)` : 'none',
+                marginBottom: 12,
+                boxShadow: isHov ? `0 0 16px color-mix(in srgb, ${accent} 22%, transparent)` : 'none',
                 transition: 'box-shadow 0.28s',
               }}>
-                <Icon size={24} color={accent} />
+                <Icon size={20} color={accent} />
               </div>
 
               {/* Name + tagline pill */}
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 10 }}>
                 <div style={{
-                  color: '#fff', fontWeight: 900, fontSize: 20, lineHeight: 1.1,
-                  marginBottom: 8, fontFamily: 'var(--font-display)',
+                  color: '#fff', fontWeight: 900, fontSize: 17, lineHeight: 1.1,
+                  marginBottom: 6, fontFamily: 'var(--font-display)',
                 }}>
                   {name}
                 </div>
@@ -233,43 +235,107 @@ const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ on
                   display: 'inline-flex', alignItems: 'center',
                   background: `color-mix(in srgb, ${accent} 10%, transparent)`,
                   border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
-                  borderRadius: 20, padding: '3px 11px',
+                  borderRadius: 20, padding: '2px 9px',
                 }}>
-                  <span style={{ color: accent, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  <span style={{ color: accent, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                     {tagline}
                   </span>
                 </div>
               </div>
 
               {/* Description */}
-              <p style={{ color: '#9ca3af', fontSize: 12.5, lineHeight: 1.7, marginBottom: 18, flex: 1 }}>
+              <p style={{ color: '#9ca3af', fontSize: 11.5, lineHeight: 1.6, marginBottom: 10 }}>
                 {description}
               </p>
 
+              {/* Illustration */}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', margin: '2px 0 8px' }}>
+                {card.id === 'analyst' && (
+                  <svg width="100%" height="88" viewBox="0 0 240 88" style={{ overflow: 'visible' }}>
+                    <line x1="0" y1="70" x2="240" y2="70" stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+                    <line x1="0" y1="48" x2="240" y2="48" stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+                    <line x1="0" y1="26" x2="240" y2="26" stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+                    <rect x="12" y="50" width="28" height="20" rx="4" fill={accent} fillOpacity="0.2"/>
+                    <rect x="58" y="36" width="28" height="34" rx="4" fill={accent} fillOpacity="0.38"/>
+                    <rect x="104" y="20" width="28" height="50" rx="4" fill={accent} fillOpacity="0.58"/>
+                    <rect x="150" y="6"  width="28" height="64" rx="4" fill={accent} fillOpacity="0.82"/>
+                    <polyline points="26,50 72,36 118,20 164,6" fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="26"  cy="50" r="3.5" fill={accent}/>
+                    <circle cx="72"  cy="36" r="3.5" fill={accent}/>
+                    <circle cx="118" cy="20" r="3.5" fill={accent}/>
+                    <circle cx="164" cy="6"  r="3.5" fill={accent}/>
+                    <rect x="183" y="2" width="54" height="16" rx="5" fill={accent} fillOpacity="0.12" stroke={accent} strokeOpacity="0.3" strokeWidth="1"/>
+                    <text x="210" y="13.5" textAnchor="middle" fontSize="8.5" fill={accent} fontFamily="monospace" fontWeight="bold">ROAS 6.2× ↑</text>
+                    <text x="26"  y="84" textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.2)">W1</text>
+                    <text x="72"  y="84" textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.2)">W2</text>
+                    <text x="118" y="84" textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.2)">W3</text>
+                    <text x="164" y="84" textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.2)">W4</text>
+                  </svg>
+                )}
+                {card.id === 'campaigner' && (
+                  <svg width="100%" height="88" viewBox="0 0 240 88">
+                    <rect x="10"  y="4"  width="220" height="22" rx="5" fill={accent} fillOpacity="0.12" stroke={accent} strokeOpacity="0.25" strokeWidth="1"/>
+                    <text x="120" y="18" textAnchor="middle" fontSize="8" fill={accent} fillOpacity="0.8" fontFamily="sans-serif" letterSpacing="2" fontWeight="700">PROSPECTING</text>
+                    <line x1="120" y1="26" x2="120" y2="38" stroke={accent} strokeOpacity="0.3" strokeWidth="1.5" strokeDasharray="3,2"/>
+                    <polygon points="115,36 120,42 125,36" fill={accent} fillOpacity="0.4"/>
+                    <rect x="35"  y="43" width="170" height="20" rx="5" fill={accent} fillOpacity="0.22" stroke={accent} strokeOpacity="0.4" strokeWidth="1"/>
+                    <text x="120" y="56.5" textAnchor="middle" fontSize="8" fill={accent} fillOpacity="0.9" fontFamily="sans-serif" letterSpacing="2" fontWeight="700">RETARGETING</text>
+                    <line x1="120" y1="63" x2="120" y2="73" stroke={accent} strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="3,2"/>
+                    <polygon points="115,71 120,77 125,71" fill={accent} fillOpacity="0.5"/>
+                    <rect x="65"  y="77" width="110" height="18" rx="5" fill={accent} fillOpacity="0.42" stroke={accent} strokeOpacity="0.65" strokeWidth="1"/>
+                    <text x="120" y="89" textAnchor="middle" fontSize="8" fill={accent} fontFamily="sans-serif" letterSpacing="2" fontWeight="700">CONVERSION</text>
+                  </svg>
+                )}
+                {card.id === 'creative' && (
+                  <svg width="100%" height="88" viewBox="0 0 240 88">
+                    {/* Card 1 — Image */}
+                    <rect x="2"   y="6"  width="68" height="70" rx="8" fill={accent} fillOpacity="0.08" stroke={accent} strokeOpacity="0.18" strokeWidth="1"/>
+                    <rect x="9"   y="13" width="54" height="34" rx="4" fill={accent} fillOpacity="0.15"/>
+                    <polygon points="18,40 36,20 54,40" fill={accent} fillOpacity="0.28"/>
+                    <circle cx="50" cy="22" r="5" fill={accent} fillOpacity="0.4"/>
+                    <text x="36" y="66" textAnchor="middle" fontSize="7.5" fill={accent} fillOpacity="0.55">Image</text>
+                    {/* Card 2 — Video (highlight) */}
+                    <rect x="86"  y="2"  width="68" height="78" rx="8" fill={accent} fillOpacity="0.15" stroke={accent} strokeOpacity="0.4" strokeWidth="1.5"/>
+                    <rect x="93"  y="9"  width="54" height="44" rx="4" fill={accent} fillOpacity="0.22"/>
+                    <circle cx="120" cy="31" r="13" fill={accent} fillOpacity="0.3"/>
+                    <polygon points="114,24 114,38 127,31" fill={accent} fillOpacity="0.9"/>
+                    <text x="120" y="68" textAnchor="middle" fontSize="7.5" fill={accent} fontWeight="bold">Video ✦</text>
+                    {/* Card 3 — Copy */}
+                    <rect x="170" y="6"  width="68" height="70" rx="8" fill={accent} fillOpacity="0.08" stroke={accent} strokeOpacity="0.18" strokeWidth="1"/>
+                    <rect x="178" y="15" width="52" height="5" rx="2" fill={accent} fillOpacity="0.38"/>
+                    <rect x="178" y="24" width="42" height="4" rx="2" fill={accent} fillOpacity="0.24"/>
+                    <rect x="178" y="32" width="46" height="4" rx="2" fill={accent} fillOpacity="0.24"/>
+                    <rect x="178" y="40" width="36" height="4" rx="2" fill={accent} fillOpacity="0.18"/>
+                    <rect x="178" y="48" width="44" height="4" rx="2" fill={accent} fillOpacity="0.18"/>
+                    <text x="204" y="66" textAnchor="middle" fontSize="7.5" fill={accent} fillOpacity="0.55">Copy</text>
+                  </svg>
+                )}
+              </div>
+
               {/* Capabilities */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
                 {capabilities.map(c => (
-                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <div style={{
-                      width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                      width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
                       background: `color-mix(in srgb, ${accent} 10%, transparent)`,
                       border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: accent }} />
+                      <div style={{ width: 4, height: 4, borderRadius: '50%', background: accent }} />
                     </div>
-                    <span style={{ color: '#9ca3af', fontSize: 11.5 }}>{c}</span>
+                    <span style={{ color: '#9ca3af', fontSize: 11 }}>{c}</span>
                   </div>
                 ))}
               </div>
 
               {/* CTA button */}
               <button style={{
-                width: '100%', padding: '12px 18px', borderRadius: 10,
+                width: '100%', padding: '10px 16px', borderRadius: 9,
                 border: `1px solid color-mix(in srgb, ${accent} ${isHov ? '70' : '35'}%, transparent)`,
                 background: isHov ? accent : `color-mix(in srgb, ${accent} 18%, transparent)`,
                 color: isHov ? '#0d0d0d' : 'rgba(255,255,255,0.9)',
-                fontSize: 12, fontWeight: 800,
+                fontSize: 11, fontWeight: 800,
                 textTransform: 'uppercase', letterSpacing: '0.08em',
                 cursor: 'pointer',
                 transition: 'background 0.28s, color 0.28s, border-color 0.28s',
@@ -283,10 +349,10 @@ const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ on
       </div>
 
       {/* Dots */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '12px 0 16px' }}>
         {AGENT_CARDS.map((card, i) => (
           <div key={i} style={{
-            width: hovered === i ? 22 : 6, height: 6, borderRadius: 3,
+            width: hovered === i ? 20 : 5, height: 5, borderRadius: 3,
             background: hovered === i ? card.accent : 'rgba(255,255,255,0.1)',
             transition: 'all 0.25s',
           }} />
@@ -836,7 +902,7 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
   const [currentPage,      setCurrentPage]      = useState<PageId>('home');
 
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
-  const [isLive,     setIsLive]     = useState(false);
+  const [_isLive,    setIsLive]     = useState(false);
   const hasDataRef = useRef(false);
 
   const fetchStatus = useCallback(async () => {
@@ -890,36 +956,42 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header
-        className="sticky top-0 z-30 border-b flex items-center justify-between"
+        className="sticky top-0 z-30 border-b"
         style={{
+          position: 'relative',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           background: 'var(--brand-surface-card)',
           borderColor: 'var(--brand-muted)',
-          padding: '0 36px',
-          height: 56,
+          padding: '0 28px',
+          height: 72,
+          flexShrink: 0,
         }}
       >
-        {/* Left — brand logo + name (click → home) */}
-        <button
-          onClick={() => setCurrentPage('home')}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-        >
-          <img
-            src={brand.logoUrl} alt={brand.name}
-            style={{ width: 30, height: 30, borderRadius: 7, objectFit: 'contain', background: `${brand.primary}18`, flexShrink: 0 }}
-            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-          />
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ color: '#fff', fontWeight: 900, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-display)', lineHeight: 1 }}>
-              {brand.name}
-            </div>
-            {!isLive && (
-              <div style={{ fontSize: 9, color: '#4b5563', fontFamily: 'monospace', marginTop: 2, letterSpacing: '0.08em' }}>DEMO</div>
-            )}
-          </div>
-        </button>
+        {/* Left — brand logo + log out */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button
+            onClick={() => setCurrentPage('home')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+          >
+            <img
+              src={brand.logoUrl} alt={brand.name}
+              style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'contain', background: `${brand.primary}18`, flexShrink: 0 }}
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          </button>
+          <div style={{ width: 1, height: 26, background: 'var(--brand-muted)' }} />
+          <button
+            onClick={onLogout}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.32)', fontSize: 11, fontWeight: 500, letterSpacing: '0.03em', padding: 0, transition: 'color 0.18s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.32)'; }}
+          >
+            <LogOut size={11} /> Log out
+          </button>
+        </div>
 
-        {/* Right — nav + logout */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* Right — nav */}
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <button
             onClick={() => { setOrchestratorOpen(o => !o); setSettingsOpen(false); }}
             style={{ ...navBtn, ...(orchestratorOpen ? pageActive('#a78bfa') : {}) }}
@@ -955,44 +1027,33 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
             onMouseLeave={e => { if (!settingsOpen) { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; } }}>
             <Settings size={12} /> Settings
           </button>
-
-          {/* Divider */}
-          <div style={{ width: 1, height: 20, background: 'var(--brand-muted)', margin: '0 2px' }} />
-
-          {/* Logout */}
-          <button
-            onClick={onLogout}
-            title="Disconnect & return to setup"
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 'var(--radius-size)', border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: 'rgba(239,68,68,0.55)', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.08em' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#ef4444'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.5)'; (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(239,68,68,0.55)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.2)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          >
-            <LogOut size={11} /> Exit
-          </button>
         </nav>
       </header>
 
       {/* ── Main ────────────────────────────────────────────────────────────── */}
       <main
-        className="max-w-screen-xl mx-auto px-6 py-8 transition-all duration-300"
-        style={(settingsOpen || orchestratorOpen) ? { marginRight: 560 } : {}}
+        className="transition-all duration-300"
+        style={{
+          ...(settingsOpen || orchestratorOpen ? { marginRight: 560 } : {}),
+          ...(currentPage === 'home' ? {
+            height: 'calc(100vh - 72px)',
+            overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
+          } : {
+            maxWidth: 1280, margin: '0 auto', padding: '0 24px',
+          }),
+        }}
       >
         {currentPage === 'home' && (
           <>
-            {/* ── Scale.ai hero banner ── */}
-            <div style={{ textAlign: 'center', padding: '48px 0 32px' }}>
-              <div style={{ marginBottom: 10 }}>
-                <span style={{
-                  fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em',
-                  fontFamily: 'var(--font-display)', lineHeight: 1,
-                  color: '#fff',
-                }}>
-                  Scale<span style={{ color: 'var(--brand-primary)' }}>.ai</span>
-                </span>
-              </div>
-              <p style={{ color: '#374151', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em' }}>
-                AI Marketing Intelligence Platform
-              </p>
+            {/* Scale.ai brand hero */}
+            <div style={{ textAlign: 'center', padding: '14px 0 6px', flexShrink: 0 }}>
+              <span style={{
+                fontSize: 58, fontWeight: 700, letterSpacing: '-0.03em',
+                fontFamily: 'var(--font-display)', lineHeight: 1, color: '#fff',
+              }}>
+                Scale<span style={{ color: 'var(--brand-primary)' }}>.ai</span>
+              </span>
             </div>
             <AgentCarousel onOpen={id => setCurrentPage(id)} />
           </>
