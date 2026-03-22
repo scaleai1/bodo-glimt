@@ -1,21 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Settings, ExternalLink, TrendingUp,
-  Activity, RefreshCw, Pause, Play,
-  ChevronDown, ChevronUp,
-  Circle, X, Plus, Sparkles,
+  Activity, ChevronDown, ChevronUp,
+  X, Sparkles,
 } from 'lucide-react';
 import { AgentProvider, useAgentBus } from '../agents/AgentContext';
 import type { AgentMessage } from '../agents/types';
 import { NewCampaignConversation } from '../components/NewCampaignConversation';
-import { ZipitAnalyst } from '../components/ZipitAnalyst';
 import { AICoachChat } from '../components/AICoachChat';
 import { BrandingSettings } from '../components/BrandingSettings';
 import { ConnectionMap } from '../components/ConnectionMap';
 import { MetaLiveFeed } from '../components/MetaLiveFeed';
-import { SiteHealthHub } from '../components/SiteHealthHub';
 import { AICreativeSuite } from '../components/AICreativeSuite';
-import { ToastProvider, useToast } from '../components/Toast';
+import { ToastProvider } from '../components/Toast';
 import { useBrand } from '../lib/BrandingService';
 import { useSiteHealth } from '../lib/SiteHealthService';
 import type { CampaignPair } from '../components/CampaignView';
@@ -98,108 +95,6 @@ const API_BASE = 'http://localhost:3001';
 const POLL_MS  = 10_000;
 
 
-// ─── Decision cell ─────────────────────────────────────────────────────────────
-
-const DecisionCell: React.FC<{ decision: CampaignPair['liveDecision']; reason: string }> = ({ decision, reason }) => {
-  const cfg = {
-    SCALE: { icon: TrendingUp, label: 'Scale', color: 'var(--brand-primary)' },
-    HOLD:  { icon: Activity,   label: 'Hold',  color: '#6b7280'              },
-    PAUSE: { icon: Pause,      label: 'Pause', color: '#ef4444'              },
-  }[decision] ?? { icon: Circle, label: decision, color: '#6b7280' };
-  const Icon = cfg.icon;
-  return (
-    <div className="flex items-center gap-1.5" title={reason}>
-      <Icon size={11} style={{ color: cfg.color, flexShrink: 0 }} />
-      <span className="text-[11px] font-mono font-bold uppercase tracking-wider" style={{ color: cfg.color }}>
-        {cfg.label}
-      </span>
-    </div>
-  );
-};
-
-// ─── Row action buttons ────────────────────────────────────────────────────────
-
-const RowActions: React.FC<{ pair: CampaignPair; isLive: boolean; onRefresh: () => void }> = ({ pair, isLive, onRefresh }) => {
-  const toast  = useToast();
-  const [busy, setBusy] = useState(false);
-
-  const act = async (type: 'pause' | 'resume' | 'scale_budget', factor?: number) => {
-    if (!isLive) {
-      toast({ variant: 'info', title: 'Demo Mode', body: 'Start the backend to apply real actions.' });
-      return;
-    }
-    setBusy(true);
-    try {
-      const res  = await fetch(`${API_BASE}/api/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, adSetId: pair.adSetId, adSetName: pair.adSetName, factor }),
-      });
-      const json = await res.json();
-      if (json.success) { toast({ variant: 'meta', title: 'Confirmed', body: json.message }); onRefresh(); }
-      else toast({ variant: 'error', title: 'Action Failed', body: json.error ?? 'Unknown error' });
-    } catch {
-      toast({ variant: 'error', title: 'Unreachable', body: 'Start the API server on port 3001.' });
-    } finally { setBusy(false); }
-  };
-
-  const isActive = pair.adSetStatus === 'ACTIVE';
-  const btn = 'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono font-bold transition-colors disabled:opacity-40';
-
-  return (
-    <div className="flex items-center gap-1.5">
-      {isActive ? (
-        <>
-          <button onClick={() => act('pause')} disabled={busy} className={btn}
-            style={{ border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444' }}>
-            <Pause size={9} /> Pause
-          </button>
-          <button onClick={() => act('scale_budget', 1.15)} disabled={busy} className={btn}
-            style={{ border: '1px solid color-mix(in srgb, var(--brand-primary) 40%, transparent)', color: 'var(--brand-primary)' }}>
-            <TrendingUp size={9} /> +15%
-          </button>
-        </>
-      ) : (
-        <button onClick={() => act('resume')} disabled={busy} className={btn}
-          style={{ border: '1px solid rgba(16,185,129,0.35)', color: '#10b981' }}>
-          <Play size={9} /> Resume
-        </button>
-      )}
-    </div>
-  );
-};
-
-// ─── Stat box ──────────────────────────────────────────────────────────────────
-
-const StatBox: React.FC<{
-  label: string; value: string; sub?: string;
-  accent?: boolean; alert?: boolean; onClick?: () => void;
-}> = ({ label, value, sub, accent, alert, onClick }) => (
-  <div
-    className="rounded border p-5 flex flex-col gap-2"
-    onClick={onClick}
-    style={{
-      background: 'var(--brand-surface-card)',
-      borderColor: accent ? 'color-mix(in srgb, var(--brand-primary) 40%, transparent)'
-                  : alert  ? 'rgba(239,68,68,0.4)'
-                  : 'var(--brand-muted)',
-      cursor: onClick ? 'pointer' : 'default',
-    }}
-    onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.borderColor = accent ? 'color-mix(in srgb, var(--brand-primary) 60%, transparent)' : 'rgba(255,255,255,0.15)'; }}
-    onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLElement).style.borderColor = accent ? 'color-mix(in srgb, var(--brand-primary) 40%, transparent)' : alert ? 'rgba(239,68,68,0.4)' : 'var(--brand-muted)'; }}
-  >
-    <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: '#6b7280' }}>
-      {label}
-    </span>
-    <p className="font-black text-2xl leading-none" style={{
-      color: accent ? 'var(--brand-primary)' : alert ? '#ef4444' : '#ffffff',
-      fontFamily: 'var(--font-display)',
-    }}>
-      {value}
-    </p>
-    {sub && <p className="text-[11px]" style={{ color: '#6b7280' }}>{sub}</p>}
-  </div>
-);
 
 // ─── Agent Carousel ────────────────────────────────────────────────────────────
 
@@ -239,11 +134,29 @@ const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ on
   const [hovered, setHovered] = React.useState<number | null>(null);
 
   return (
-    <section>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+    <section style={{ padding: '8px 0 24px' }}>
+
+      {/* Hero header */}
+      <div style={{ textAlign: 'center', marginBottom: 36 }}>
+        <p style={{ color: '#6b7280', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 10 }}>
+          AI Marketing Intelligence
+        </p>
+        <h1 style={{
+          color: '#fff', fontSize: 30, fontWeight: 900, letterSpacing: '-0.025em',
+          lineHeight: 1.12, fontFamily: 'var(--font-display)', margin: '0 0 12px',
+        }}>
+          Your AI Marketing Command Center
+        </h1>
+        <p style={{ color: '#6b7280', fontSize: 13, maxWidth: 440, margin: '0 auto', lineHeight: 1.6 }}>
+          Three specialized agents working in perfect sync to scale your revenue and eliminate waste.
+        </p>
+      </div>
+
+      {/* Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
         {AGENT_CARDS.map((card, i) => {
           const { Icon, name, accent, tagline, description, capabilities } = card;
-          const isHovered = hovered === i;
+          const isHov = hovered === i;
           return (
             <div
               key={card.id}
@@ -251,83 +164,135 @@ const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ on
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
               style={{
-                background:    'var(--brand-surface-card)',
-                border:        `1px solid ${isHovered ? `color-mix(in srgb, ${accent} 45%, transparent)` : 'var(--brand-muted)'}`,
-                borderRadius:  10,
-                padding:       '20px',
-                cursor:        'pointer',
-                transition:    'border-color 0.2s, box-shadow 0.2s',
                 position:      'relative',
                 overflow:      'hidden',
-                boxShadow:     isHovered ? `0 0 0 1px color-mix(in srgb, ${accent} 15%, transparent), 0 4px 20px rgba(0,0,0,0.3)` : 'none',
+                borderRadius:  16,
+                padding:       '30px 26px 26px',
+                cursor:        'pointer',
+                minHeight:     340,
+                display:       'flex',
+                flexDirection: 'column',
+                background:    `linear-gradient(145deg, color-mix(in srgb, ${accent} 10%, #111827) 0%, color-mix(in srgb, ${accent} 4%, #0d1117) 100%)`,
+                border:        `1px solid color-mix(in srgb, ${accent} ${isHov ? '45' : '18'}%, transparent)`,
+                boxShadow:     isHov
+                  ? `0 0 0 1px color-mix(in srgb, ${accent} 18%, transparent), 0 16px 48px color-mix(in srgb, ${accent} 18%, rgba(0,0,0,0.6))`
+                  : '0 2px 12px rgba(0,0,0,0.35)',
+                transform:   isHov ? 'translateY(-5px)' : 'translateY(0)',
+                transition:  'transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease',
               }}
             >
-              {/* Top accent line */}
+              {/* Top accent bar */}
               <div style={{
-                position:   'absolute', top: 0, left: 0, right: 0, height: 2,
-                background: isHovered ? `linear-gradient(90deg, ${accent}, transparent)` : 'transparent',
-                transition: 'background 0.2s',
+                position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                background: `linear-gradient(90deg, ${accent} 0%, transparent 70%)`,
+                opacity: isHov ? 1 : 0.45,
+                transition: 'opacity 0.28s',
               }} />
 
-              {/* Icon + Name */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              {/* Watermark icon */}
+              <div style={{
+                position: 'absolute', bottom: -16, right: -16,
+                opacity: isHov ? 0.1 : 0.04,
+                transition: 'opacity 0.28s',
+                pointerEvents: 'none',
+              }}>
+                <Icon size={128} color={accent} />
+              </div>
+
+              {/* Agent number badge */}
+              <div style={{
+                position: 'absolute', top: 22, right: 22,
+                width: 24, height: 24, borderRadius: '50%',
+                background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${accent} 28%, transparent)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 900, color: accent, fontFamily: 'monospace',
+              }}>
+                0{i + 1}
+              </div>
+
+              {/* Icon box */}
+              <div style={{
+                width: 54, height: 54, borderRadius: 14, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: `color-mix(in srgb, ${accent} 14%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${accent} 28%, transparent)`,
+                marginBottom: 18,
+                boxShadow: isHov ? `0 0 20px color-mix(in srgb, ${accent} 22%, transparent)` : 'none',
+                transition: 'box-shadow 0.28s',
+              }}>
+                <Icon size={24} color={accent} />
+              </div>
+
+              {/* Name + tagline pill */}
+              <div style={{ marginBottom: 14 }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: `color-mix(in srgb, ${accent} 12%, transparent)`,
-                  border:     `1px solid color-mix(in srgb, ${accent} 25%, transparent)`,
-                  flexShrink: 0,
+                  color: '#fff', fontWeight: 900, fontSize: 20, lineHeight: 1.1,
+                  marginBottom: 8, fontFamily: 'var(--font-display)',
                 }}>
-                  <Icon size={18} color={accent} />
+                  {name}
                 </div>
-                <div>
-                  <div style={{ color: '#fff', fontWeight: 800, fontSize: 14, lineHeight: 1 }}>{name}</div>
-                  <div style={{ color: accent, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 3 }}>{tagline}</div>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  background: `color-mix(in srgb, ${accent} 10%, transparent)`,
+                  border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
+                  borderRadius: 20, padding: '3px 11px',
+                }}>
+                  <span style={{ color: accent, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                    {tagline}
+                  </span>
                 </div>
               </div>
 
               {/* Description */}
-              <p style={{ color: '#9ca3af', fontSize: 12, lineHeight: 1.6, marginBottom: 14 }}>{description}</p>
+              <p style={{ color: '#9ca3af', fontSize: 12.5, lineHeight: 1.7, marginBottom: 18, flex: 1 }}>
+                {description}
+              </p>
 
               {/* Capabilities */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
                 {capabilities.map(c => (
-                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: accent, flexShrink: 0, opacity: 0.7 }} />
-                    <span style={{ color: '#6b7280', fontSize: 11 }}>{c}</span>
+                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                      background: `color-mix(in srgb, ${accent} 10%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${accent} 24%, transparent)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: accent }} />
+                    </div>
+                    <span style={{ color: '#9ca3af', fontSize: 11.5 }}>{c}</span>
                   </div>
                 ))}
               </div>
 
-              {/* CTA */}
-              <div style={{
-                width: '100%', padding: '8px 14px', borderRadius: 6,
-                border:      `1px solid color-mix(in srgb, ${accent} 30%, transparent)`,
-                background:  `color-mix(in srgb, ${accent} ${isHovered ? '12%' : '6%'}, transparent)`,
-                color:       accent, fontSize: 11, fontWeight: 700,
+              {/* CTA button */}
+              <button style={{
+                width: '100%', padding: '12px 18px', borderRadius: 10,
+                border: `1px solid color-mix(in srgb, ${accent} ${isHov ? '60' : '30'}%, transparent)`,
+                background: isHov ? accent : `color-mix(in srgb, ${accent} 14%, transparent)`,
+                color: isHov ? '#000' : accent,
+                fontSize: 12, fontWeight: 800,
                 textTransform: 'uppercase', letterSpacing: '0.08em',
-                textAlign:   'center', transition: 'background 0.2s',
+                cursor: 'pointer',
+                transition: 'background 0.28s, color 0.28s, border-color 0.28s',
+                fontFamily: 'inherit',
               }}>
                 Open {name} →
-              </div>
+              </button>
             </div>
           );
         })}
       </div>
 
       {/* Dots */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 18 }}>
         {AGENT_CARDS.map((card, i) => (
-          <div
-            key={i}
-            style={{
-              width:        hovered === i ? 18 : 5,
-              height:       5,
-              borderRadius: 3,
-              background:   hovered === i ? card.accent : 'rgba(255,255,255,0.08)',
-              transition:   'all 0.25s',
-            }}
-          />
+          <div key={i} style={{
+            width: hovered === i ? 22 : 6, height: 6, borderRadius: 3,
+            background: hovered === i ? card.accent : 'rgba(255,255,255,0.1)',
+            transition: 'all 0.25s',
+          }} />
         ))}
       </div>
     </section>
@@ -381,6 +346,14 @@ const SettingsPanel: React.FC<{ isOpen: boolean; onClose: () => void; metaUrl: s
       <ExternalLink size={13} />
     </a>
     <BrandingSettings />
+  </SidePanel>
+);
+
+// ─── Creative panel ────────────────────────────────────────────────────────────
+
+const CreativePanel: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => (
+  <SidePanel isOpen={isOpen} onClose={onClose} title="AI Creative Studio" accent="#a78bfa" width={660}>
+    <AICreativeSuite />
   </SidePanel>
 );
 
@@ -682,12 +655,11 @@ const DashboardInner: React.FC = () => {
   const [orchestratorOpen,    setOrchestratorOpen]    = useState(false);
   const [devOpen,        setDevOpen]        = useState(false);
   const [campaignPanelOpen, setCampaignPanelOpen] = useState(false);
-  const [healthVisible, setHealthVisible] = useState(false);
+  const [creativeOpen,      setCreativeOpen]      = useState(false);
 
   // ── Campaign polling ─────────────────────────────────────────────────────────
   const [statusData, setStatusData] = useState<StatusResponse | null>(null);
   const [isLive,     setIsLive]     = useState(false);
-  const [lastFetch,  setLastFetch]  = useState<string | null>(null);
   const hasDataRef = useRef(false);
 
   const fetchStatus = useCallback(async () => {
@@ -707,8 +679,6 @@ const DashboardInner: React.FC = () => {
         hasDataRef.current = true;
       }
       setIsLive(false);
-    } finally {
-      setLastFetch(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     }
   }, []);
 
@@ -729,10 +699,6 @@ const DashboardInner: React.FC = () => {
   const avgRoas    = roasPairs.length ? roasPairs.reduce((s, p) => s + p.roas!, 0) / roasPairs.length : 0;
   const wasteSaved = statusData?.totalWasteSavedUsd ?? 0;
   const siteHealth = statusData?.siteHealth ?? 'OK';
-  const healthOk   = siteHealth === 'OK' || siteHealth === 'GREEN';
-
-  const healthRef    = useRef<HTMLDivElement>(null);
-  const creativeRef  = useRef<HTMLDivElement>(null);
 
   const dashboardContext = JSON.stringify({
     isLiveData: isLive, siteHealth,
@@ -830,10 +796,10 @@ const DashboardInner: React.FC = () => {
           </button>
           {/* AI Creative */}
           <button
-            onClick={() => creativeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            style={{ ...navBtnStyle }}
+            onClick={() => { setCreativeOpen(o => !o); setOrchestratorOpen(false); setAnalystChatOpen(false); setCampaignPanelOpen(false); setSettingsOpen(false); }}
+            style={{ ...navBtnStyle, ...(creativeOpen ? { color: '#a78bfa', borderColor: 'color-mix(in srgb,#a78bfa 40%,transparent)' } : {}) }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#a78bfa'; (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb,#a78bfa 40%,transparent)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; }}>
+            onMouseLeave={e => { if (!creativeOpen) { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; } }}>
             <Sparkles size={12} /> AI Creative
           </button>
           {/* Settings */}
@@ -849,281 +815,26 @@ const DashboardInner: React.FC = () => {
 
       {/* ── Main ────────────────────────────────────────────────────────────── */}
       <main
-        className="max-w-screen-xl mx-auto px-6 py-8 space-y-10 transition-all duration-300"
-        style={settingsOpen || campaignPanelOpen ? { marginRight: '500px' } : {}}
+        className="max-w-screen-xl mx-auto px-6 py-8 transition-all duration-300"
+        style={(settingsOpen || campaignPanelOpen || creativeOpen) ? { marginRight: '680px' } : {}}
       >
-
-
-        {/* ── Agent Carousel ────────────────────────────────────────────────── */}
         <AgentCarousel onOpen={(id) => {
           setOrchestratorOpen(false);
           setSettingsOpen(false);
           if (id === 'analyst') {
             setAnalystChatOpen(true);
             setCampaignPanelOpen(false);
+            setCreativeOpen(false);
           } else if (id === 'campaigner') {
             setCampaignPanelOpen(true);
             setAnalystChatOpen(false);
+            setCreativeOpen(false);
           } else {
             setAnalystChatOpen(false);
             setCampaignPanelOpen(false);
-            creativeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setCreativeOpen(true);
           }
         }} />
-
-        {/* ── Stat boxes ────────────────────────────────────────────────────── */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatBox
-            label="Daily Spend"
-            value={`$${totalSpend.toFixed(2)}`}
-            sub={isLive ? 'Live from Meta' : 'Demo data'}
-          />
-          <StatBox
-            label="Blended ROAS"
-            value={roasPairs.length ? `${avgRoas.toFixed(2)}x` : '—'}
-            sub={avgRoas > 5 ? 'Above scale threshold' : avgRoas > 3 ? 'Optimize range' : avgRoas > 0 ? 'Below floor' : 'No data'}
-            accent={avgRoas >= 5}
-            alert={avgRoas > 0 && avgRoas < 3}
-          />
-          <StatBox
-            label="System Health"
-            value={
-              health.latest
-                ? `Health: ${health.latest.overallStatus}`
-                : healthOk ? 'Healthy' : siteHealth
-            }
-            sub={
-              health.lastRunAt
-                ? `Last check: ${health.lastRunAt} · ${health.latest?.functionalPct ?? 100}% functional`
-                : healthOk
-                ? `${pairs.filter(p => p.liveDecision === 'PAUSE').length} safety pauses active`
-                : 'All ad sets paused'
-            }
-            accent={health.latest ? health.latest.overallStatus === 'Optimal' : healthOk}
-            alert={health.latest ? health.latest.overallStatus === 'Critical' : !healthOk}
-            onClick={() => {
-              setHealthVisible(true);
-              setTimeout(() => healthRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-            }}
-          />
-          <StatBox
-            label="Total Savings"
-            value={`$${wasteSaved.toFixed(2)}`}
-            sub="Waste prevented by engine"
-            accent={wasteSaved > 0}
-          />
-        </section>
-
-        {/* ── Active Campaigns ──────────────────────────────────────────────── */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-white font-black text-sm uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
-                Campaigns
-              </h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={fetchStatus}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors"
-                style={{ border: '1px solid var(--brand-muted)', color: '#6b7280', background: 'transparent' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--brand-primary)'; (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb, var(--brand-primary) 40%, transparent)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#6b7280'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; }}
-              >
-                <RefreshCw size={10} /> Refresh
-              </button>
-              <button
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors"
-                style={{ border: '1px solid color-mix(in srgb, var(--brand-primary) 40%, transparent)', color: 'var(--brand-primary)', background: 'color-mix(in srgb, var(--brand-primary) 8%, transparent)' }}
-                onClick={() => { setCampaignPanelOpen(true); setSettingsOpen(false); setChatOpen(false); }}
-                title={isLive ? 'Create a new campaign via Meta API' : 'Preview campaign creation (demo)'}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--brand-primary) 14%, transparent)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--brand-primary) 8%, transparent)'; }}
-              >
-                <Plus size={10} /> Zipit Campaigner
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded border overflow-hidden" style={{ background: 'var(--brand-surface-card)', borderColor: 'var(--brand-muted)' }}>
-            {/* Table header — Meta Ads Manager style */}
-            <div
-              className="grid gap-0 px-4 py-2.5 border-b"
-              style={{
-                gridTemplateColumns: '2fr 72px 80px 90px 100px 80px 72px 80px 148px',
-                borderColor: 'var(--brand-muted)',
-                background: 'rgba(0,0,0,0.25)',
-              }}
-            >
-              {['Campaign / Ad Set', 'Status', 'Budget', 'Spend', 'Impressions', 'Results', 'CPA', 'ROAS', 'AI Decision'].map(h => (
-                <span key={h} className="text-[10px] font-mono uppercase tracking-widest" style={{ color: '#4b5563' }}>{h}</span>
-              ))}
-            </div>
-
-            {pairs.map(pair => {
-              const isActive = pair.adSetStatus === 'ACTIVE';
-              const rowBg =
-                pair.liveDecision === 'PAUSE' ? 'rgba(239,68,68,0.03)' :
-                pair.liveDecision === 'SCALE' ? 'color-mix(in srgb, var(--brand-primary) 3%, transparent)' :
-                'transparent';
-              const roasColor = pair.roas == null ? '#4b5563' : pair.roas > 5 ? 'var(--brand-primary)' : pair.roas >= 3 ? '#ffffff' : '#ef4444';
-
-              return (
-                <div
-                  key={pair.productId}
-                  className="grid gap-0 px-4 py-3 border-b last:border-b-0 transition-colors"
-                  style={{
-                    gridTemplateColumns: '2fr 72px 80px 90px 100px 80px 72px 80px 148px',
-                    borderColor: 'var(--brand-muted)',
-                    background: rowBg,
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBg; }}
-                >
-                  {/* Campaign / Ad Set */}
-                  <div className="flex flex-col gap-0.5 min-w-0 pr-4">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-white text-xs font-semibold truncate">{pair.adSetName}</span>
-                      {pair.campaignObjective && (
-                        <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded uppercase tracking-wider"
-                          style={{ background: 'rgba(255,255,255,0.06)', color: '#6b7280', border: '1px solid var(--brand-muted)' }}>
-                          {pair.campaignObjective}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-mono truncate" style={{ color: '#4b5563' }}>
-                      {pair.campaignName ?? pair.productName}
-                    </span>
-                  </div>
-
-                  {/* Status */}
-                  <div className="flex items-center">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ background: isActive ? '#10b981' : '#6b7280' }}
-                      />
-                      <span className="text-[10px] font-mono" style={{ color: isActive ? '#10b981' : '#6b7280' }}>
-                        {isActive ? 'Active' : 'Paused'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Budget */}
-                  <div className="flex items-center">
-                    <span className="text-xs font-mono tabular-nums" style={{ color: '#9ca3af' }}>
-                      {pair.dailyBudgetUsd != null ? `$${pair.dailyBudgetUsd.toFixed(0)}/day` : '—'}
-                    </span>
-                  </div>
-
-                  {/* Spend */}
-                  <div className="flex items-center">
-                    <span className="text-xs font-mono font-medium tabular-nums text-white">
-                      {pair.spend != null ? `$${pair.spend.toFixed(2)}` : '—'}
-                    </span>
-                  </div>
-
-                  {/* Impressions */}
-                  <div className="flex items-center">
-                    <span className="text-xs font-mono tabular-nums" style={{ color: '#9ca3af' }}>
-                      {pair.impressions != null ? pair.impressions.toLocaleString() : '—'}
-                    </span>
-                  </div>
-
-                  {/* Results (purchases) */}
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-mono font-bold tabular-nums text-white">
-                      {pair.results != null ? pair.results : '—'}
-                    </span>
-                    {pair.results != null && (
-                      <span className="text-[9px] font-mono" style={{ color: '#4b5563' }}>purchases</span>
-                    )}
-                  </div>
-
-                  {/* CPA */}
-                  <div className="flex items-center">
-                    <span
-                      className="text-xs font-mono tabular-nums"
-                      style={{ color: pair.costPerResult == null ? '#4b5563' : pair.costPerResult < 10 ? '#10b981' : pair.costPerResult < 25 ? '#f59e0b' : '#ef4444' }}
-                    >
-                      {pair.costPerResult != null ? `$${pair.costPerResult.toFixed(2)}` : '—'}
-                    </span>
-                  </div>
-
-                  {/* ROAS */}
-                  <div className="flex items-center">
-                    <span className="text-xs font-mono font-bold tabular-nums" style={{ color: roasColor }}>
-                      {pair.roas != null ? `${pair.roas.toFixed(2)}x` : '—'}
-                    </span>
-                  </div>
-
-                  {/* AI Decision + Actions */}
-                  <div className="flex items-center gap-2">
-                    <DecisionCell decision={pair.liveDecision} reason={pair.liveDecisionReason} />
-                    <RowActions pair={pair} isLive={isLive} onRefresh={fetchStatus} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {lastFetch && (
-            <p className="text-[10px] font-mono mt-2" style={{ color: '#374151' }}>
-              Last sync: {lastFetch} · Auto-refresh every 10s{statusData?.accountId ? ` · ${statusData.accountId}` : ''}
-            </p>
-          )}
-        </section>
-
-        {/* ── Site Health Hub ────────────────────────────────────────────────── */}
-        <section ref={healthRef}>
-          <button
-            className="w-full flex items-center justify-between mb-4"
-            onClick={() => setHealthVisible(o => !o)}
-          >
-            <div className="flex items-center gap-3">
-              <h2 className="text-white font-black text-sm uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
-                Site Health Hub
-              </h2>
-            </div>
-            {healthVisible ? <ChevronUp size={14} color="#4b5563" /> : <ChevronDown size={14} color="#4b5563" />}
-          </button>
-
-          {healthVisible && (
-            <SiteHealthHub
-              latest={health.latest}
-              history={health.history}
-              checking={health.checking}
-              lastRunAt={health.lastRunAt}
-              nextRunIn={health.nextRunIn}
-              onRunCheck={health.runCheck}
-            />
-          )}
-        </section>
-
-        {/* ── Zipit Analyst ─────────────────────────────────────────────────── */}
-        <section>
-          <ZipitAnalyst
-            pairs={pairs}
-            dashboardContext={dashboardContext}
-            siteHealth={siteHealth}
-            isLive={isLive}
-            onOpenChat={() => setAnalystChatOpen(true)}
-          />
-        </section>
-
-
-        {/* ── AI Creative Suite ──────────────────────────────────────────────── */}
-        <section ref={creativeRef}>
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles size={14} color="#a78bfa" />
-            <h2 className="text-white font-black text-sm uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
-              AI Creative Suite
-            </h2>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }}>
-              Meta Ad Generator
-            </span>
-          </div>
-          <AICreativeSuite />
-        </section>
 
 
       </main>
@@ -1156,15 +867,16 @@ const DashboardInner: React.FC = () => {
       <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} dashboardContext={dashboardContext} />
       <AnalystChatPanel isOpen={analystChatOpen} onClose={() => setAnalystChatOpen(false)} />
       <OrchestratorChatPanel isOpen={orchestratorOpen} onClose={() => setOrchestratorOpen(false)} />
+      <CreativePanel isOpen={creativeOpen} onClose={() => setCreativeOpen(false)} />
 
       <NewCampaignConversation
         isOpen={campaignPanelOpen}
         onClose={() => setCampaignPanelOpen(false)}
       />
 
-      {(settingsOpen || chatOpen || analystChatOpen || orchestratorOpen) && (
+      {(settingsOpen || chatOpen || analystChatOpen || orchestratorOpen || creativeOpen) && (
         <div className="fixed inset-0 z-30" style={{ background: 'rgba(0,0,0,0.3)' }}
-          onClick={() => { setSettingsOpen(false); setChatOpen(false); setAnalystChatOpen(false); setOrchestratorOpen(false); }} />
+          onClick={() => { setSettingsOpen(false); setChatOpen(false); setAnalystChatOpen(false); setOrchestratorOpen(false); setCreativeOpen(false); }} />
       )}
     </div>
   );

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Globe, Check, ArrowRight, Loader2, Zap,
   Palette, SkipForward, AlertCircle, ChevronRight,
+  Upload, FileText, Activity,
 } from 'lucide-react';
 import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/BrandingService';
 import type { BrandConfig } from '../lib/BrandingService';
@@ -137,6 +138,98 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
   );
 }
 
+// ── File Analyst Section ──────────────────────────────────────────────────────
+
+function FileAnalystSection() {
+  const [file,     setFile]     = useState<File | null>(null);
+  const [analysis, setAnalysis] = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [err,      setErr]      = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function analyzeFile(f: File) {
+    setFile(f);
+    setAnalysis('');
+    setErr('');
+    setLoading(true);
+    try {
+      const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
+      if (!key) throw new Error('No AI key configured');
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => resolve((e.target?.result as string) ?? '');
+        reader.onerror = reject;
+        reader.readAsText(f);
+      });
+      const result = await callClaude(
+        'You are a marketing data analyst. Analyze the uploaded file and provide 3–5 clear, actionable insights. Be concise. Focus on ad performance and business growth.',
+        `File: ${f.name}\n\n${text.slice(0, 8000)}`,
+      );
+      setAnalysis(result);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Analysis failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="h-px flex-1 bg-white/[0.06]" />
+        <span className="text-[11px] text-white/25 uppercase tracking-widest">or analyze a file</span>
+        <div className="h-px flex-1 bg-white/[0.06]" />
+      </div>
+
+      <div
+        onClick={() => inputRef.current?.click()}
+        className="relative border border-dashed border-white/10 rounded-xl p-5 cursor-pointer text-center transition-colors hover:border-amber-400/30 hover:bg-amber-400/[0.02]"
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          accept=".csv,.xlsx,.xls,.pdf,.txt,.json,.md"
+          onChange={e => { const f = e.target.files?.[0]; if (f) analyzeFile(f); }}
+        />
+        {loading ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 size={20} className="animate-spin text-amber-400" />
+            <span className="text-white/40 text-xs">Analyzing {file?.name}…</span>
+          </div>
+        ) : file ? (
+          <div className="flex items-center justify-center gap-2">
+            <FileText size={14} className="text-amber-400" />
+            <span className="text-white/60 text-xs">{file.name}</span>
+            <span className="text-white/25 text-xs">· click to change</span>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <Upload size={18} className="mx-auto text-white/20" />
+            <p className="text-white/30 text-xs">Upload CSV, Excel, PDF or text file</p>
+            <p className="text-white/15 text-[10px]">Get instant AI analysis — no setup needed</p>
+          </div>
+        )}
+      </div>
+
+      {err && (
+        <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/20 rounded-lg p-3">
+          <AlertCircle size={12} className="shrink-0" /> {err}
+        </div>
+      )}
+
+      {analysis && (
+        <div className="bg-amber-400/[0.04] border border-amber-400/15 rounded-xl p-4 space-y-2">
+          <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+            <Activity size={10} /> AI Analysis
+          </div>
+          <p className="text-white/60 text-xs leading-relaxed whitespace-pre-wrap">{analysis}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Brand Step ────────────────────────────────────────────────────────────────
 
 interface BrandStepState {
@@ -237,6 +330,8 @@ function BrandStep({ onContinue, onSkip }: {
           <AlertCircle size={12} className="shrink-0" /> {s.error}
         </div>
       )}
+
+      <FileAnalystSection />
 
       {/* Brand Preview */}
       {s.config && (
