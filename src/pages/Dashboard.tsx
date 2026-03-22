@@ -691,7 +691,13 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 // ─── Campaigner page ───────────────────────────────────────────────────────────
 
-const CampaignerPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+const DECISION_STYLE: Record<string, { color: string; bg: string; label: string }> = {
+  SCALE: { color: '#10b981', bg: 'rgba(16,185,129,0.1)',  label: '▲ Scale'  },
+  HOLD:  { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  label: '⏸ Hold'   },
+  PAUSE: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '⏹ Pause'  },
+};
+
+const CampaignerPage: React.FC<{ onBack: () => void; pairs: CampaignPair[] }> = ({ onBack, pairs }) => {
   const [panelOpen, setPanelOpen] = useState(true);
   const ACCENT = 'var(--brand-primary)';
 
@@ -704,48 +710,103 @@ const CampaignerPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         tagline="AI Ad Builder"
         onBack={onBack}
       >
-        <div style={{
-          background: 'rgba(0,0,0,0.2)',
-          border: '1px solid var(--brand-muted)', borderRadius: 16,
-          padding: '32px 36px',
-          transition: 'margin-right 0.3s',
-          marginRight: panelOpen ? 510 : 0,
-        }}>
-          <h2 style={{ color: '#fff', fontWeight: 900, fontSize: 22, fontFamily: 'var(--font-display)', marginBottom: 14 }}>
-            AI Campaign Builder
-          </h2>
-          <p style={{ color: '#9ca3af', fontSize: 13.5, lineHeight: 1.75, marginBottom: 28 }}>
-            Launch full Meta campaigns through natural conversation. Describe your audience and objective — the agent handles structure, targeting, and budgets via the live Meta Ads API.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
-            {[
-              { label: 'Natural language setup', desc: 'Tell the agent your product, audience, and goal in plain language' },
-              { label: 'Live Meta API connection', desc: 'Campaigns created in real-time directly in your ad account' },
-              { label: 'Budget & ad set management', desc: 'Automatic campaign structure, targeting, and daily budget configuration' },
-            ].map(({ label, desc }) => (
-              <div key={label} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: ACCENT, marginTop: 6, flexShrink: 0 }} />
-                <div>
-                  <div style={{ color: '#e2e8f0', fontSize: 13.5, fontWeight: 700 }}>{label}</div>
-                  <div style={{ color: '#6b7280', fontSize: 12.5, marginTop: 3, lineHeight: 1.5 }}>{desc}</div>
+        <div style={{ transition: 'margin-right 0.3s', marginRight: panelOpen ? 510 : 0 }}>
+
+          {/* ── Active Campaigns table ── */}
+          <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--brand-muted)', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
+            {/* Table header */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '2fr 90px 90px 70px 70px 110px',
+              gap: 0,
+              padding: '10px 20px',
+              borderBottom: '1px solid var(--brand-muted)',
+              background: 'rgba(255,255,255,0.02)',
+            }}>
+              {['Campaign / Ad Set', 'Status', 'Budget/day', 'Spend', 'ROAS', 'Decision'].map(h => (
+                <span key={h} style={{ color: '#4b5563', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{h}</span>
+              ))}
+            </div>
+
+            {/* Rows */}
+            {pairs.map((p, i) => {
+              const ds = DECISION_STYLE[p.liveDecision ?? 'HOLD'] ?? DECISION_STYLE.HOLD;
+              const isActive = p.adSetStatus === 'ACTIVE';
+              return (
+                <div
+                  key={p.adSetId}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 90px 90px 70px 70px 110px',
+                    gap: 0,
+                    padding: '12px 20px',
+                    borderBottom: i < pairs.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                    alignItems: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
+                  {/* Name */}
+                  <div>
+                    <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600, lineHeight: 1.2 }}>{p.productName}</div>
+                    <div style={{ color: '#4b5563', fontSize: 11, marginTop: 2 }}>{p.adSetName}</div>
+                  </div>
+                  {/* Status */}
+                  <div>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                      color: isActive ? '#10b981' : '#6b7280',
+                      background: isActive ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isActive ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                    }}>
+                      {isActive ? '● Active' : '○ Paused'}
+                    </span>
+                  </div>
+                  {/* Budget */}
+                  <div style={{ color: '#9ca3af', fontSize: 12, fontWeight: 600 }}>${(p.dailyBudgetUsd ?? 0).toFixed(0)}</div>
+                  {/* Spend */}
+                  <div style={{ color: '#9ca3af', fontSize: 12 }}>${p.spend?.toFixed(0) ?? '—'}</div>
+                  {/* ROAS */}
+                  <div style={{ color: p.roas && p.roas >= 5 ? '#10b981' : p.roas && p.roas >= 3 ? '#f59e0b' : '#ef4444', fontSize: 12, fontWeight: 700 }}>
+                    {p.roas != null ? `${p.roas.toFixed(1)}x` : '—'}
+                  </div>
+                  {/* Decision */}
+                  <div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, color: ds.color, background: ds.bg }}>
+                      {ds.label}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          {!panelOpen && (
-            <button
-              onClick={() => setPanelOpen(true)}
-              style={{
-                padding: '12px 28px', borderRadius: 10,
-                border: `1px solid color-mix(in srgb, ${ACCENT} 40%, transparent)`,
-                background: `color-mix(in srgb, ${ACCENT} 15%, transparent)`,
-                color: '#fff', fontSize: 12, fontWeight: 800,
-                textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer',
-              }}
-            >
-              Open Campaign Builder →
-            </button>
-          )}
+
+          {/* ── Launch new campaign strip ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'rgba(0,0,0,0.2)', border: '1px solid var(--brand-muted)',
+            borderRadius: 12, padding: '16px 22px',
+          }}>
+            <div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>Launch a new campaign</div>
+              <div style={{ color: '#6b7280', fontSize: 12, marginTop: 3 }}>Describe your goal — the agent handles targeting, structure & budget</div>
+            </div>
+            {!panelOpen && (
+              <button
+                onClick={() => setPanelOpen(true)}
+                style={{
+                  padding: '10px 22px', borderRadius: 9, flexShrink: 0,
+                  border: `1px solid color-mix(in srgb, ${ACCENT} 40%, transparent)`,
+                  background: `color-mix(in srgb, ${ACCENT} 15%, transparent)`,
+                  color: '#fff', fontSize: 12, fontWeight: 800,
+                  textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer',
+                }}
+              >
+                Open Builder →
+              </button>
+            )}
+          </div>
         </div>
       </PageShell>
       <NewCampaignConversation isOpen={panelOpen} onClose={() => setPanelOpen(false)} />
@@ -807,6 +868,7 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
     return () => clearInterval(iv);
   }, [fetchStatus]);
 
+  const pairs = statusData?.pairs ?? MOCK_PAIRS;
   const accountNum = (statusData?.accountId ?? '').replace('act_', '');
   const metaUrl    = accountNum
     ? `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountNum}`
@@ -831,39 +893,49 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header
-        className="sticky top-0 z-30 flex items-center justify-between border-b"
+        className="sticky top-0 z-30 border-b"
         style={{
           background: 'var(--brand-surface-card)',
           borderColor: 'var(--brand-muted)',
-          padding: '0 48px',
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
+          alignItems: 'center',
+          padding: '0 36px',
           height: 64,
         }}
       >
-        {/* Logo — click → home */}
+        {/* Left — brand logo + name (click → home) */}
         <button
           onClick={() => setCurrentPage('home')}
-          className="flex items-center gap-3"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0, justifySelf: 'start' }}
         >
           <img
             src={brand.logoUrl} alt={brand.name}
-            className="w-8 h-8 rounded object-contain"
-            style={{ background: `${brand.primary}18` }}
+            style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'contain', background: `${brand.primary}18`, flexShrink: 0 }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
-          <span className="font-black text-white text-sm uppercase tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
-            {brand.name}
-          </span>
-          {!isLive && (
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#6b7280', border: '1px solid rgba(255,255,255,0.08)' }}>
-              DEMO
-            </span>
-          )}
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ color: '#fff', fontWeight: 900, fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-display)', lineHeight: 1 }}>
+              {brand.name}
+            </div>
+            {!isLive && (
+              <div style={{ fontSize: 9, color: '#4b5563', fontFamily: 'monospace', marginTop: 2, letterSpacing: '0.08em' }}>DEMO MODE</div>
+            )}
+          </div>
         </button>
 
-        <nav className="flex items-center gap-2">
-          {/* Chief Agent */}
+        {/* Center — Scale.ai platform brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifySelf: 'center' }}>
+          <div style={{ width: 26, height: 26, background: 'var(--brand-primary)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 12px color-mix(in srgb, var(--brand-primary) 35%, transparent)' }}>
+            <Sparkles size={13} color="#000" />
+          </div>
+          <span style={{ color: '#fff', fontWeight: 900, fontSize: 15, letterSpacing: '-0.01em', fontFamily: 'var(--font-display)' }}>
+            Scale<span style={{ color: 'var(--brand-primary)' }}>.ai</span>
+          </span>
+        </div>
+
+        {/* Right — nav + logout */}
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 6, justifySelf: 'end' }}>
           <button
             onClick={() => { setOrchestratorOpen(o => !o); setSettingsOpen(false); }}
             style={{ ...navBtn, ...(orchestratorOpen ? pageActive('#a78bfa') : {}) }}
@@ -871,7 +943,6 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
             onMouseLeave={e => { if (!orchestratorOpen) { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; } }}>
             <Sparkles size={12} /> Chief Agent
           </button>
-          {/* Analyst */}
           <button
             onClick={() => { setCurrentPage('analyst'); setOrchestratorOpen(false); setSettingsOpen(false); }}
             style={{ ...navBtn, ...(currentPage === 'analyst' ? pageActive('#06b6d4') : {}) }}
@@ -879,7 +950,6 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
             onMouseLeave={e => { if (currentPage !== 'analyst') { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; } }}>
             <Activity size={12} /> Analyst
           </button>
-          {/* Campaigner */}
           <button
             onClick={() => { setCurrentPage('campaigner'); setOrchestratorOpen(false); setSettingsOpen(false); }}
             style={{ ...navBtn, ...(currentPage === 'campaigner' ? pageActive('var(--brand-primary)') : {}) }}
@@ -887,7 +957,6 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
             onMouseLeave={e => { if (currentPage !== 'campaigner') { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; } }}>
             <TrendingUp size={12} /> Campaigner
           </button>
-          {/* AI Creative */}
           <button
             onClick={() => { setCurrentPage('creative'); setOrchestratorOpen(false); setSettingsOpen(false); }}
             style={{ ...navBtn, ...(currentPage === 'creative' ? pageActive('#a78bfa') : {}) }}
@@ -895,13 +964,26 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
             onMouseLeave={e => { if (currentPage !== 'creative') { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; } }}>
             <Sparkles size={12} /> AI Creative
           </button>
-          {/* Settings */}
           <button
             onClick={() => { setSettingsOpen(o => !o); setOrchestratorOpen(false); }}
             style={{ ...navBtn, ...(settingsOpen ? pageActive('var(--brand-primary)') : {}) }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--brand-primary)'; (e.currentTarget as HTMLElement).style.borderColor = 'color-mix(in srgb,var(--brand-primary) 40%,transparent)'; }}
             onMouseLeave={e => { if (!settingsOpen) { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-muted)'; } }}>
             <Settings size={12} /> Settings
+          </button>
+
+          {/* Divider */}
+          <div style={{ width: 1, height: 20, background: 'var(--brand-muted)', margin: '0 2px' }} />
+
+          {/* Logout */}
+          <button
+            onClick={onLogout}
+            title="Disconnect & return to setup"
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 'var(--radius-size)', border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: 'rgba(239,68,68,0.55)', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.08em' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#ef4444'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.5)'; (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(239,68,68,0.55)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.2)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          >
+            <LogOut size={11} /> Exit
           </button>
         </nav>
       </header>
@@ -913,7 +995,7 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
       >
         {currentPage === 'home'       && <AgentCarousel onOpen={id => setCurrentPage(id)} />}
         {currentPage === 'analyst'    && <AnalystPage    onBack={() => setCurrentPage('home')} />}
-        {currentPage === 'campaigner' && <CampaignerPage onBack={() => setCurrentPage('home')} />}
+        {currentPage === 'campaigner' && <CampaignerPage onBack={() => setCurrentPage('home')} pairs={pairs} />}
         {currentPage === 'creative'   && <CreativePage   onBack={() => setCurrentPage('home')} />}
       </main>
 
