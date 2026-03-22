@@ -893,49 +893,36 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header
-        className="sticky top-0 z-30 border-b"
+        className="sticky top-0 z-30 border-b flex items-center justify-between"
         style={{
           background: 'var(--brand-surface-card)',
           borderColor: 'var(--brand-muted)',
-          display: 'grid',
-          gridTemplateColumns: '1fr auto 1fr',
-          alignItems: 'center',
           padding: '0 36px',
-          height: 64,
+          height: 56,
         }}
       >
         {/* Left — brand logo + name (click → home) */}
         <button
           onClick={() => setCurrentPage('home')}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0, justifySelf: 'start' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
         >
           <img
             src={brand.logoUrl} alt={brand.name}
-            style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'contain', background: `${brand.primary}18`, flexShrink: 0 }}
+            style={{ width: 30, height: 30, borderRadius: 7, objectFit: 'contain', background: `${brand.primary}18`, flexShrink: 0 }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
           <div style={{ textAlign: 'left' }}>
-            <div style={{ color: '#fff', fontWeight: 900, fontSize: 13, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-display)', lineHeight: 1 }}>
+            <div style={{ color: '#fff', fontWeight: 900, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-display)', lineHeight: 1 }}>
               {brand.name}
             </div>
             {!isLive && (
-              <div style={{ fontSize: 9, color: '#4b5563', fontFamily: 'monospace', marginTop: 2, letterSpacing: '0.08em' }}>DEMO MODE</div>
+              <div style={{ fontSize: 9, color: '#4b5563', fontFamily: 'monospace', marginTop: 2, letterSpacing: '0.08em' }}>DEMO</div>
             )}
           </div>
         </button>
 
-        {/* Center — Scale.ai platform brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifySelf: 'center' }}>
-          <div style={{ width: 26, height: 26, background: 'var(--brand-primary)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 12px color-mix(in srgb, var(--brand-primary) 35%, transparent)' }}>
-            <Sparkles size={13} color="#000" />
-          </div>
-          <span style={{ color: '#fff', fontWeight: 900, fontSize: 15, letterSpacing: '-0.01em', fontFamily: 'var(--font-display)' }}>
-            Scale<span style={{ color: 'var(--brand-primary)' }}>.ai</span>
-          </span>
-        </div>
-
         {/* Right — nav + logout */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 6, justifySelf: 'end' }}>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             onClick={() => { setOrchestratorOpen(o => !o); setSettingsOpen(false); }}
             style={{ ...navBtn, ...(orchestratorOpen ? pageActive('#a78bfa') : {}) }}
@@ -993,7 +980,30 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
         className="max-w-screen-xl mx-auto px-6 py-8 transition-all duration-300"
         style={(settingsOpen || orchestratorOpen) ? { marginRight: 560 } : {}}
       >
-        {currentPage === 'home'       && <AgentCarousel onOpen={id => setCurrentPage(id)} />}
+        {currentPage === 'home' && (
+          <>
+            {/* ── Scale.ai hero banner ── */}
+            <div style={{ textAlign: 'center', padding: '40px 0 36px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 14,
+                  background: 'var(--brand-primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 0 32px color-mix(in srgb, var(--brand-primary) 40%, transparent)',
+                }}>
+                  <Sparkles size={24} color="#000" />
+                </div>
+                <span style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.03em', fontFamily: 'var(--font-display)', color: '#fff', lineHeight: 1 }}>
+                  Scale<span style={{ color: 'var(--brand-primary)' }}>.ai</span>
+                </span>
+              </div>
+              <p style={{ color: '#4b5563', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+                AI Marketing Intelligence Platform
+              </p>
+            </div>
+            <AgentCarousel onOpen={id => setCurrentPage(id)} />
+          </>
+        )}
         {currentPage === 'analyst'    && <AnalystPage    onBack={() => setCurrentPage('home')} />}
         {currentPage === 'campaigner' && <CampaignerPage onBack={() => setCurrentPage('home')} pairs={pairs} />}
         {currentPage === 'creative'   && <CreativePage   onBack={() => setCurrentPage('home')} />}
