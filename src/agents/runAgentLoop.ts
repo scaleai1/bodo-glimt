@@ -5,10 +5,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { ClaudeToolDefinition, AgentAction, AgentId } from './types';
 
-const client = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true,
-});
+function getClient() {
+  return new Anthropic({
+    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+    dangerouslyAllowBrowser: true,
+  });
+}
 
 // SDK message shape for the conversation array
 type ApiMessage = Anthropic.MessageParam;
@@ -52,7 +54,7 @@ export async function runAgentLoop({
   while (rounds < maxRounds) {
     rounds++;
 
-    const response = await client.messages.create({
+    const response = await getClient().messages.create({
       model,
       max_tokens: 4096,
       system:     systemPrompt,

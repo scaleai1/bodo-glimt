@@ -3,10 +3,12 @@
 
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
-});
+function getOpenAI() {
+  return new OpenAI({
+    apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+    dangerouslyAllowBrowser: true,
+  });
+}
 
 export type SocialPlatform = 'instagram' | 'facebook' | 'tiktok';
 
@@ -45,7 +47,7 @@ export async function generateCaption(
     ? `Brand: ${brandName}${brandTone ? ` · Tone: ${brandTone}` : ''}\n`
     : '';
 
-  const res = await openai.chat.completions.create({
+  const res = await getOpenAI().chat.completions.create({
     model:      'gpt-4o-mini',
     max_tokens: 350,
     messages: [{
