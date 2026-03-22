@@ -138,9 +138,6 @@ const AgentCarousel: React.FC<{ onOpen: (id: AgentCarouselId) => void }> = ({ on
 
       {/* Hero header */}
       <div style={{ textAlign: 'center', marginBottom: 36 }}>
-        <p style={{ color: '#6b7280', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 10 }}>
-          AI Marketing Intelligence
-        </p>
         <h1 style={{
           color: '#fff', fontSize: 30, fontWeight: 900, letterSpacing: '-0.025em',
           lineHeight: 1.12, fontFamily: 'var(--font-display)', margin: '0 0 12px',
@@ -983,21 +980,17 @@ const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => 
         {currentPage === 'home' && (
           <>
             {/* ── Scale.ai hero banner ── */}
-            <div style={{ textAlign: 'center', padding: '40px 0 36px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <div style={{
-                  width: 48, height: 48, borderRadius: 14,
-                  background: 'var(--brand-primary)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 0 32px color-mix(in srgb, var(--brand-primary) 40%, transparent)',
+            <div style={{ textAlign: 'center', padding: '48px 0 32px' }}>
+              <div style={{ marginBottom: 10 }}>
+                <span style={{
+                  fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em',
+                  fontFamily: 'var(--font-display)', lineHeight: 1,
+                  color: '#fff',
                 }}>
-                  <Sparkles size={24} color="#000" />
-                </div>
-                <span style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.03em', fontFamily: 'var(--font-display)', color: '#fff', lineHeight: 1 }}>
                   Scale<span style={{ color: 'var(--brand-primary)' }}>.ai</span>
                 </span>
               </div>
-              <p style={{ color: '#4b5563', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+              <p style={{ color: '#374151', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em' }}>
                 AI Marketing Intelligence Platform
               </p>
             </div>
