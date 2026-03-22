@@ -134,6 +134,8 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
       >
         Get Started <ArrowRight size={20} />
       </button>
+
+      <FileAnalystSection />
     </div>
   );
 }
