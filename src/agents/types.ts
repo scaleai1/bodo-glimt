@@ -11,7 +11,7 @@ export const AGENT_META: Record<AgentId, { name: string; codename: string; color
     description: 'Strategy, planning & delegation',
   },
   creative: {
-    name:        'Zipit Studio',
+    name:        'Scale Studio',
     codename:    'Creative',
     color:       '#f472b6',
     description: 'AI ideation & asset generation',

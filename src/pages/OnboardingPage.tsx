@@ -96,7 +96,7 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         </div>
         <div className="text-left">
           <div className="text-3xl font-black text-white tracking-tight leading-none">
-            Zipit<span className="text-amber-400">.</span>ai
+            Scale<span className="text-amber-400">.</span>ai
           </div>
           <div className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5">Marketing Platform</div>
         </div>
@@ -666,7 +666,7 @@ function DoneStep({ brandName, metaConnected, onDashboard }: {
 
       <div>
         <h2 className="text-3xl font-black text-white">All Done!</h2>
-        <p className="text-white/40 text-sm mt-2">Your Zipit.ai workspace is ready.</p>
+        <p className="text-white/40 text-sm mt-2">Your Scale.ai workspace is ready.</p>
       </div>
 
       <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4 text-left space-y-2.5">

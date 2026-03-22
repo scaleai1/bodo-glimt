@@ -1,4 +1,4 @@
-// ─── Zipit Analyst ────────────────────────────────────────────────────────────
+// ─── Scale Analyst ────────────────────────────────────────────────────────────
 // Auto-running AI analyst: campaigns every 15min, file analysis on upload,
 // site & server health checks. Replaces the old Report Center.
 
@@ -239,7 +239,7 @@ Tasks:
                 className="text-white font-black text-sm uppercase tracking-widest"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                Zipit Analyst
+                Scale Analyst
               </h2>
               <p className="text-[11px] font-mono mt-0.5" style={{ color: '#4b5563' }}>
                 Auto-optimizes every 15 min · analyzes files · monitors site health
@@ -283,7 +283,7 @@ Tasks:
                 ? <RefreshCw size={14} color={AGENT_COLOR} className="animate-spin" />
                 : <Activity size={14} color={AGENT_COLOR} />}
               <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: AGENT_COLOR }}>
-                Zipit Analyst
+                Scale Analyst
               </span>
             </button>
           </div>

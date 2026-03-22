@@ -120,7 +120,7 @@ const ALL_AGENTS: AgentId[] = ['orchestrator', 'creative', 'campaigner', 'analys
 
 const GREETINGS: Record<AgentId, string> = {
   orchestrator: "I'm your Head of Agents. Tell me your marketing goal — I'll coordinate the team to execute it. For example: **\"Launch a summer sale campaign for luxury shoes\"** or **\"Why are my ads underperforming?\"**",
-  creative:     "I'm Zipit Studio, your creative AI. Tell me what to generate: **images, videos, or captions**. I'll match your brand style automatically.",
+  creative:     "I'm Scale Studio, your creative AI. Tell me what to generate: **images, videos, or captions**. I'll match your brand style automatically.",
   campaigner:   "I'm your Ads Manager. I can fetch your active ad sets, attach new creatives, and push campaigns live to Meta. What would you like to do?",
   analyst:      "I'm your Insights analyst. Ask me about **ROAS performance**, which campaigns to scale or pause, creative fatigue, or geo opportunities.",
 };
