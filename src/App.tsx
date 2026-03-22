@@ -10,9 +10,7 @@ function App() {
     if (window.location.hash === '#onboarding') return 'onboarding';
     // Already completed onboarding
     if (getUserConfig().completed) return 'dashboard';
-    // Power-user / developer: Replicate token is already in .env.local → skip onboarding
-    if (import.meta.env.VITE_REPLICATE_API_TOKEN) return 'dashboard';
-    // New client with no API keys → show onboarding
+    // New client → show onboarding
     return 'onboarding';
   });
 
