@@ -4,6 +4,8 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { ClaudeToolDefinition, AgentAction, AgentId } from './types';
+import { supabase } from '../lib/supabase';
+import { decryptToken } from '../lib/tokenCrypto';
 
 function getClient() {
   return new Anthropic({
@@ -42,6 +44,30 @@ export async function runAgentLoop({
   onAction,
   maxRounds = 10,
 }: RunAgentLoopOptions): Promise<{ text: string; updatedHistory: ApiMessage[] }> {
+  // Require a valid Supabase session before executing any agent
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Unauthorized: no active session. Please sign in.');
+
+  // Fetch user profile, decrypt the stored Meta token, inject into system prompt
+  const { data: rawProfile } = await supabase
+    .from('profiles')
+    .select('brand_name, website_url, brand_colors, industry, tone, keywords, meta_access_token, meta_ad_account_id, meta_facebook_page_id, meta_instagram_account_id')
+    .eq('id', session.user.id)
+    .single();
+
+  const profile = rawProfile
+    ? {
+        ...rawProfile,
+        meta_access_token: rawProfile.meta_access_token
+          ? await decryptToken(rawProfile.meta_access_token as string, session.user.id)
+          : '',
+      }
+    : null;
+
+  const enrichedSystemPrompt = profile
+    ? `${systemPrompt}\n\n---\n## Active User — Brand Context\n${buildBrandContext(profile)}`
+    : systemPrompt;
+
   // Build the message array for this turn
   const messages: ApiMessage[] = [
     ...history,
@@ -57,7 +83,7 @@ export async function runAgentLoop({
     const response = await getClient().messages.create({
       model,
       max_tokens: 4096,
-      system:     systemPrompt,
+      system:     enrichedSystemPrompt,
       tools:      tools as Anthropic.Tool[],
       messages,
     });
@@ -129,6 +155,24 @@ export async function runAgentLoop({
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildBrandContext(profile: Record<string, unknown>): string {
+  const lines: string[] = [];
+  if (profile.brand_name)   lines.push(`- Brand name: ${profile.brand_name}`);
+  if (profile.website_url)  lines.push(`- Website: ${profile.website_url}`);
+  if (profile.industry)     lines.push(`- Industry: ${profile.industry}`);
+  if (profile.tone)         lines.push(`- Tone of voice: ${profile.tone}`);
+  if (Array.isArray(profile.keywords) && (profile.keywords as string[]).length > 0)
+    lines.push(`- Keywords: ${(profile.keywords as string[]).join(', ')}`);
+  const colors = profile.brand_colors as { primary?: string; secondary?: string } | null;
+  if (colors?.primary)   lines.push(`- Primary brand color: ${colors.primary}`);
+  if (colors?.secondary) lines.push(`- Secondary brand color: ${colors.secondary}`);
+  if (profile.meta_ad_account_id)        lines.push(`- Meta Ad Account ID: ${profile.meta_ad_account_id}`);
+  if (profile.meta_facebook_page_id)     lines.push(`- Meta Facebook Page ID: ${profile.meta_facebook_page_id}`);
+  if (profile.meta_instagram_account_id) lines.push(`- Meta Instagram Account ID: ${profile.meta_instagram_account_id}`);
+  if (profile.meta_access_token)         lines.push(`- Meta Access Token: ${profile.meta_access_token}`);
+  return lines.join('\n');
+}
 
 function formatToolLabel(name: string, input: Record<string, unknown>): string {
   const labelMap: Record<string, string> = {

@@ -6,7 +6,7 @@
   /* ── Brand identity ──────────────────────────────────────────────────────── */
   --brand-primary:        #F0B429;
   --brand-secondary:      #F5C842;
-  --brand-logo:           url('/bodo-glimt/sporting-cp-logo.png');
+  --brand-logo:           url('/sporting-cp-logo.png');
 
   /* ── Semantic palette (overridden by BrandingService on Apply) ──────────── */
   --brand-surface:        #080808;

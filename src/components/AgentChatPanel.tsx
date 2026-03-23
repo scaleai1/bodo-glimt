@@ -122,6 +122,38 @@ function GreetingBubble({ text, agentId }: { text: string; agentId: AgentId }) {
   );
 }
 
+// ─── Delegation chip (shown when Orchestrator consults a specialist) ──────────
+
+function extractDelegationTarget(lastAction: string): AgentId | null {
+  if (/analyst|insights/i.test(lastAction))                return 'analyst';
+  if (/creative|studio/i.test(lastAction))                 return 'creative';
+  if (/campaigner|ads.?manager/i.test(lastAction))         return 'campaigner';
+  return null;
+}
+
+function DelegationChip({ label, targetId }: { label: string; targetId: AgentId }) {
+  const target = AGENT_META[targetId];
+  return (
+    <div className="flex items-start gap-3 my-1">
+      <div className="shrink-0 w-7" />
+      <div
+        className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider"
+        style={{
+          background: `${target.color}10`,
+          border:     `1px solid ${target.color}30`,
+          color:      `${target.color}bb`,
+        }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: target.color, animation: 'pulse 1.4s ease-in-out infinite' }}
+        />
+        {label}
+      </div>
+    </div>
+  );
+}
+
 // ─── Thinking indicator ───────────────────────────────────────────────────────
 
 function ThinkingIndicator({ agentId }: { agentId: AgentId }) {
@@ -195,6 +227,10 @@ export const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
           return <AgentBubble key={msg.id} msg={msg} agentId={agentId} />;
         })}
 
+        {isThinking && (() => {
+          const target = extractDelegationTarget(conv.lastAction);
+          return target ? <DelegationChip label={conv.lastAction} targetId={target} /> : null;
+        })()}
         {isThinking && <ThinkingIndicator agentId={agentId} />}
         <div ref={bottomRef} />
       </div>

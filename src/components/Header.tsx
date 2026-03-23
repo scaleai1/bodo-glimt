@@ -32,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
               alt={brand.name}
               className="w-11 h-11 rounded-full border-2 object-contain"
               style={{ borderColor: brand.primary, boxShadow: `0 0 8px ${brand.primary}66` }}
-              onError={e => { (e.currentTarget as HTMLImageElement).src = '/bodo-glimt/sporting-cp-logo.png'; }}
+              onError={e => { (e.currentTarget as HTMLImageElement).src = '/sporting-cp-logo.png'; }}
             />
             {/* Live pulse dot */}
             <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-success-green rounded-full border-2 border-pitch-dark animate-ping" />

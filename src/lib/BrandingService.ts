@@ -70,7 +70,7 @@ const STORAGE_KEY = 'scaleai_brand_v3';
 export const DEFAULT_BRAND: BrandConfig = {
   domain:    '',
   name:      'ScaleAI',
-  logoUrl:   '/bodo-glimt/sporting-cp-logo.png',
+  logoUrl:   '/sporting-cp-logo.png',
   primary:   '#FBBF24',
   secondary: '#06D6F0',
   vibe:      'sharp',

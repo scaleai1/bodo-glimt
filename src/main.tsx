@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { applyBrand, loadBrand } from './lib/BrandingService'
+import { AuthProvider } from './lib/AuthContext'
 
 // Boot: apply persisted brand before first render (prevents flash of default colors)
 applyBrand(loadBrand());
@@ -29,7 +30,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </ErrorBoundary>
   </StrictMode>,
 )
