@@ -32,8 +32,12 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          VITE_SUPABASE_URL:         ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY:    ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_ANTHROPIC_API_KEY:    ${{ secrets.VITE_ANTHROPIC_API_KEY }}
+          VITE_OPENAI_API_KEY:       ${{ secrets.VITE_OPENAI_API_KEY }}
           VITE_REPLICATE_API_TOKEN:  ${{ secrets.VITE_REPLICATE_API_TOKEN }}
+          VITE_ENCRYPTION_KEY:       ${{ secrets.VITE_ENCRYPTION_KEY }}
 
       - uses: actions/configure-pages@v4
 
