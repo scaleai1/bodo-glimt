@@ -7,8 +7,6 @@ import {
 import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/BrandingService';
 import { scanBrand, saveBrand as saveBrandProfile } from '../lib/brandContext';
 import { saveUserConfig } from '../lib/userConfig';
-import { supabase } from '../lib/supabase';
-import { encryptToken } from '../lib/tokenCrypto';
 import Anthropic from '@anthropic-ai/sdk';
 
 // ── Meta Graph API ────────────────────────────────────────────────────────────
@@ -559,9 +557,6 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
   const [brandName,  setBrandName]  = useState('');
   const [brandError, setBrandError] = useState('');
 
-  // Save state
-  const [saving, setSaving] = useState(false);
-
   // Meta state
   const [token,           setToken]           = useState('');
   const [metaLoading,     setMetaLoading]     = useState(false);
@@ -584,19 +579,12 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
       applyBrand(cfg); saveBrandConfig(cfg);
       saveUserConfig({ websiteUrl: cfg.domain, brandName: finalName, logoUrl: cfg.logoUrl, primaryColor: cfg.primary });
       setBrandDone(true);
-      saveToSupabase({
-        brand_name:     finalName,
-        website_url:    cfg.domain,
-        brand_logo_url: cfg.logoUrl,
-        brand_colors:   { primary: cfg.primary, secondary: '' },
-      }).catch(() => {});
       const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
       if (key) {
         try {
           const profile = await scanBrand(full, callClaude);
           saveBrandProfile(profile);
           saveUserConfig({ industry: profile.industry, tone: profile.tone, keywords: profile.keywords });
-          saveToSupabase({ industry: profile.industry, tone: profile.tone, keywords: profile.keywords }).catch(() => {});
         } catch { /* silent */ }
       }
     } catch {
@@ -614,33 +602,13 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
       setSelectedAccount(accs[0]?.id ?? ''); setSelectedPage(pgs[0]?.id ?? '');
       setMetaConnected(true);
       saveUserConfig({ metaAccessToken: t, metaAdAccountId: accs[0]?.id ?? '', metaFacebookPageId: pgs[0]?.id ?? '' });
-      saveToSupabase({
-        meta_access_token:     t,
-        meta_ad_account_id:    accs[0]?.id ?? '',
-        meta_facebook_page_id: pgs[0]?.id ?? '',
-      }).catch(() => {});
     } catch {
       setMetaError('Connection failed. Check your token and try again.');
     } finally { setMetaLoading(false); }
   }
 
-  async function saveToSupabase(data: Record<string, unknown>): Promise<void> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const toSave = { ...data };
-    if (typeof toSave.meta_access_token === 'string' && toSave.meta_access_token) {
-      toSave.meta_access_token = await encryptToken(toSave.meta_access_token, session.user.id);
-    }
-    await supabase.from('profiles').update(toSave).eq('id', session.user.id);
-  }
-
-  async function handleDone() {
-    setSaving(true);
-    try {
-      saveUserConfig({ completed: true });
-      await saveToSupabase({ onboarding_completed: true });
-    } catch { /* silent — don't block navigation on save error */ }
-    setSaving(false);
+  function handleDone() {
+    saveUserConfig({ completed: true });
     onComplete();
   }
 
@@ -648,7 +616,7 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-black text-white">Quick Setup</h2>
-        <button onClick={handleDone} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:text-white/80 hover:border-white/20 disabled:opacity-40 text-[11px] font-semibold transition-colors">
+        <button onClick={handleDone} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:text-white/80 hover:border-white/20 text-[11px] font-semibold transition-colors">
           <SkipForward size={11} /> Skip all → Dashboard
         </button>
       </div>
@@ -710,13 +678,13 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
         ) : (
           <div className="space-y-2">
             {accounts.length > 1 && (
-              <select value={selectedAccount} onChange={e => { setSelectedAccount(e.target.value); saveUserConfig({ metaAdAccountId: e.target.value }); saveToSupabase({ meta_ad_account_id: e.target.value }).catch(() => {}); }}
+              <select value={selectedAccount} onChange={e => { setSelectedAccount(e.target.value); saveUserConfig({ metaAdAccountId: e.target.value }); }}
                 className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none">
                 {accounts.map(a => <option key={a.id} value={a.id} className="bg-[#0c0d12]">{a.name}</option>)}
               </select>
             )}
             {pages.length > 1 && (
-              <select value={selectedPage} onChange={e => { setSelectedPage(e.target.value); saveUserConfig({ metaFacebookPageId: e.target.value }); saveToSupabase({ meta_facebook_page_id: e.target.value }).catch(() => {}); }}
+              <select value={selectedPage} onChange={e => { setSelectedPage(e.target.value); saveUserConfig({ metaFacebookPageId: e.target.value }); }}
                 className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none">
                 {pages.map(p => <option key={p.id} value={p.id} className="bg-[#0c0d12]">{p.name}</option>)}
               </select>
@@ -726,9 +694,9 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
         {metaError && <p className="text-xs text-red-400">{metaError}</p>}
       </div>
 
-      <button onClick={handleDone} disabled={saving}
-        className="w-full py-3.5 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] disabled:opacity-60 text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all">
-        {saving ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : <>Go to Dashboard <ArrowRight size={16} /></>}
+      <button onClick={handleDone}
+        className="w-full py-3.5 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all">
+        Go to Dashboard <ArrowRight size={16} />
       </button>
     </div>
   );
