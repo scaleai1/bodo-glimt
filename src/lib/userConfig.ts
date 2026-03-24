@@ -17,6 +17,10 @@ export interface UserConfig {
   metaAdAccountId:        string;
   metaFacebookPageId:     string;
   metaInstagramAccountId: string;
+  siteAdminApiKey:        string;
+  sitePlatformType:       string;   // 'shopify' | 'woocommerce' | 'custom' | ''
+  siteApiUrl:             string;
+  proofOfLifeStats:       object | null;
 }
 
 const KEY = 'zipit_user_config_v1';
@@ -35,6 +39,10 @@ const DEFAULTS: UserConfig = {
   metaAdAccountId:        '',
   metaFacebookPageId:     '',
   metaInstagramAccountId: '',
+  siteAdminApiKey:        '',
+  sitePlatformType:       '',
+  siteApiUrl:             '',
+  proofOfLifeStats:       null,
 };
 
 export function getUserConfig(): UserConfig {

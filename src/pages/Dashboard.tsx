@@ -13,6 +13,7 @@ import { MetaLiveFeed } from '../components/MetaLiveFeed';
 import { AICreativeSuite } from '../components/AICreativeSuite';
 import { ToastProvider } from '../components/Toast';
 import { useBrand } from '../lib/BrandingService';
+import { getUserConfig } from '../lib/userConfig';
 
 
 import type { CampaignPair } from '../components/CampaignView';
@@ -658,6 +659,11 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const messages = conv.messages.filter((m: AgentMessage) => m.from === 'user' || m.from === 'analyst');
 
+  // System connectivity status
+  const cfg = getUserConfig();
+  const metaConnected = !!(cfg.metaAccessToken || import.meta.env.VITE_META_ACCESS_TOKEN);
+  const siteConnected = !!(cfg.siteApiUrl && cfg.siteAdminApiKey);
+
   return (
     <PageShell
       accent={ACCENT}
@@ -666,6 +672,66 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       tagline="Campaign Intelligence"
       onBack={onBack}
     >
+      {/* ── System Connectivity Bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        padding: '10px 16px',
+        background: 'rgba(0,0,0,0.2)',
+        border: '1px solid var(--brand-muted)',
+        borderRadius: 12,
+        marginBottom: 12,
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 4 }}>
+          System
+        </span>
+
+        {/* Meta status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: metaConnected ? '#10b981' : '#4b5563',
+            boxShadow:  metaConnected ? '0 0 6px #10b981' : 'none',
+          }} />
+          <span style={{ fontSize: 11, color: metaConnected ? '#10b981' : '#6b7280', fontWeight: 600 }}>
+            Meta Ads: {metaConnected ? 'Connected' : 'Not configured'}
+          </span>
+        </div>
+
+        <span style={{ color: '#374151', fontSize: 10 }}>|</span>
+
+        {/* Website status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: siteConnected ? '#10b981' : '#4b5563',
+            boxShadow:  siteConnected ? '0 0 6px #10b981' : 'none',
+          }} />
+          <span style={{ fontSize: 11, color: siteConnected ? '#10b981' : '#6b7280', fontWeight: 600 }}>
+            Website Management: {siteConnected ? `Connected (${cfg.sitePlatformType || 'custom'})` : 'Not configured'}
+          </span>
+        </div>
+
+        {/* Correlation Analysis button */}
+        <button
+          onClick={() => {
+            setInput('Run a full correlation analysis: pull Meta Ads insights and website revenue for the last 30 days, validate ROAS attribution, check inventory alerts, and give me a prioritized action plan.');
+          }}
+          style={{
+            marginLeft: 'auto', padding: '5px 14px',
+            background: metaConnected ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${metaConnected ? 'rgba(6,182,212,0.35)' : 'rgba(255,255,255,0.1)'}`,
+            borderRadius: 8, cursor: metaConnected ? 'pointer' : 'not-allowed',
+            color: metaConnected ? ACCENT : '#4b5563',
+            fontSize: 11, fontWeight: 700,
+            opacity: isRunning ? 0.5 : 1,
+          }}
+          disabled={isRunning || !metaConnected}
+          title={metaConnected ? 'Run full Meta + Website correlation analysis' : 'Connect Meta Ads first'}
+        >
+          ⚡ Full Correlation Analysis
+        </button>
+      </div>
+
       <div style={{
         background: 'rgba(0,0,0,0.2)',
         border: '1px solid var(--brand-muted)',

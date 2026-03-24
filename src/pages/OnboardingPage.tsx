@@ -8,6 +8,61 @@ import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/B
 import { scanBrand, saveBrand as saveBrandProfile } from '../lib/brandContext';
 import { saveUserConfig } from '../lib/userConfig';
 import Anthropic from '@anthropic-ai/sdk';
+import type { AdInsights } from '../lib/metaAds';
+import { fetchAccountInsights } from '../lib/metaAds';
+
+// ── Facebook SDK (OAuth login) ─────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    fbAsyncInit?: () => void;
+    FB?: {
+      init: (config: { appId: string; version: string; cookie?: boolean; xfbml?: boolean }) => void;
+      login: (
+        cb: (r: { authResponse?: { accessToken: string; userID: string } }) => void,
+        opts?: { scope?: string },
+      ) => void;
+    };
+  }
+}
+
+let _fbSdkReady = false;
+
+async function loadFBSdk(): Promise<void> {
+  if (_fbSdkReady) return;
+  const appId = (import.meta.env.VITE_META_APP_ID as string | undefined) ?? '';
+  if (!appId) throw new Error('NO_APP_ID');
+  if (window.FB) { _fbSdkReady = true; return; }
+
+  return new Promise<void>(resolve => {
+    window.fbAsyncInit = () => {
+      window.FB!.init({ appId, version: 'v19.0', cookie: false, xfbml: false });
+      _fbSdkReady = true;
+      resolve();
+    };
+    if (!document.getElementById('fb-sdk-script')) {
+      const s    = document.createElement('script');
+      s.id       = 'fb-sdk-script';
+      s.src      = 'https://connect.facebook.net/en_US/sdk.js';
+      s.async    = true;
+      s.crossOrigin = 'anonymous';
+      document.head.appendChild(s);
+    }
+  });
+}
+
+async function fbOAuthLogin(): Promise<string> {
+  await loadFBSdk();
+  return new Promise<string>((resolve, reject) => {
+    window.FB!.login(
+      res => {
+        if (res.authResponse?.accessToken) resolve(res.authResponse.accessToken);
+        else reject(new Error('Facebook login was cancelled or permissions denied.'));
+      },
+      { scope: 'ads_management,ads_read,business_management,pages_read_engagement,instagram_basic' },
+    );
+  });
+}
 
 // ── Meta Graph API ────────────────────────────────────────────────────────────
 
@@ -547,9 +602,23 @@ function FileAnalystSection() {
   );
 }
 
+// ── Proof-of-Life Stats Panel ─────────────────────────────────────────────────
+
+function StatPill({ label, value, color = '#F0B429' }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.07] rounded-lg p-2.5 text-center">
+      <div style={{ fontSize: 17, fontWeight: 900, color, lineHeight: 1 }}>{value}</div>
+      <div className="text-white/35 text-[10px] mt-1">{label}</div>
+    </div>
+  );
+}
+
 // ── Combined Setup Step ────────────────────────────────────────────────────────
 
 function SetupStep({ onComplete }: { onComplete: () => void }) {
+  // Sub-step: 0 = Brand DNA, 1 = Meta Connect, 2 = Proof of Life / Done
+  const [subStep, setSubStep] = useState<0 | 1 | 2>(0);
+
   // Brand state
   const [url,        setUrl]        = useState('');
   const [detecting,  setDetecting]  = useState(false);
@@ -567,6 +636,12 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
   const [selectedPage,    setSelectedPage]    = useState('');
   const [metaError,       setMetaError]       = useState('');
 
+  // Proof of life
+  const [proofStats,    setProofStats]    = useState<AdInsights | null>(null);
+  const [statsLoading,  setStatsLoading]  = useState(false);
+
+  const hasFBAppId = !!(import.meta.env.VITE_META_APP_ID as string | undefined);
+
   async function detectBrand() {
     const raw = url.trim();
     if (!raw) return;
@@ -574,10 +649,9 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
     setDetecting(true); setBrandError('');
     try {
       const cfg = await resolveBrand(full);
-      const finalName = cfg.name;
-      setBrandName(finalName);
+      setBrandName(cfg.name);
       applyBrand(cfg); saveBrandConfig(cfg);
-      saveUserConfig({ websiteUrl: cfg.domain, brandName: finalName, logoUrl: cfg.logoUrl, primaryColor: cfg.primary });
+      saveUserConfig({ websiteUrl: cfg.domain, brandName: cfg.name, logoUrl: cfg.logoUrl, primaryColor: cfg.primary });
       setBrandDone(true);
       const key = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
       if (key) {
@@ -592,16 +666,48 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
     } finally { setDetecting(false); }
   }
 
-  async function connectMeta() {
+  async function finishMetaConnection(t: string, accs: MetaAccount[], pgs: MetaPage[]) {
+    setAccounts(accs); setPages(pgs);
+    const acctId = accs[0]?.id ?? '';
+    const pageId = pgs[0]?.id ?? '';
+    setSelectedAccount(acctId); setSelectedPage(pageId);
+    setMetaConnected(true);
+    saveUserConfig({ metaAccessToken: t, metaAdAccountId: acctId, metaFacebookPageId: pageId });
+
+    // Proof of life: pull real stats
+    if (acctId) {
+      setStatsLoading(true);
+      setSubStep(2);
+      try {
+        const stats = await fetchAccountInsights(acctId, t, 'last_30d');
+        setProofStats(stats);
+      } catch { /* non-fatal */ } finally {
+        setStatsLoading(false);
+      }
+    } else {
+      setSubStep(2);
+    }
+  }
+
+  async function handleFBLogin() {
+    setMetaLoading(true); setMetaError('');
+    try {
+      const t = await fbOAuthLogin();
+      setToken(t);
+      const [accs, pgs] = await Promise.all([fetchAdAccounts(t), fetchPages(t)]);
+      await finishMetaConnection(t, accs, pgs);
+    } catch (e) {
+      setMetaError(e instanceof Error ? e.message : 'Connection failed.');
+    } finally { setMetaLoading(false); }
+  }
+
+  async function connectMetaToken() {
     const t = token.trim();
     if (!t) return;
     setMetaLoading(true); setMetaError('');
     try {
       const [accs, pgs] = await Promise.all([fetchAdAccounts(t), fetchPages(t)]);
-      setAccounts(accs); setPages(pgs);
-      setSelectedAccount(accs[0]?.id ?? ''); setSelectedPage(pgs[0]?.id ?? '');
-      setMetaConnected(true);
-      saveUserConfig({ metaAccessToken: t, metaAdAccountId: accs[0]?.id ?? '', metaFacebookPageId: pgs[0]?.id ?? '' });
+      await finishMetaConnection(t, accs, pgs);
     } catch {
       setMetaError('Connection failed. Check your token and try again.');
     } finally { setMetaLoading(false); }
@@ -612,92 +718,220 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
     onComplete();
   }
 
+  // ── Step indicator ─────────────────────────────────────────────────────────
+  const steps = ['Brand DNA', 'Meta Ads', 'Dashboard'];
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-black text-white">Quick Setup</h2>
         <button onClick={handleDone} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:text-white/80 hover:border-white/20 text-[11px] font-semibold transition-colors">
-          <SkipForward size={11} /> Skip all → Dashboard
+          <SkipForward size={11} /> Skip → Dashboard
         </button>
       </div>
 
-      {/* ── Brand section ── */}
-      <div className="border border-white/[0.07] rounded-xl p-4 space-y-3 bg-white/[0.02]">
-        <div className="flex items-center gap-2">
-          <Globe size={13} className="text-yellow-400" />
-          <span className="text-sm font-bold text-white">Brand DNA</span>
-          {brandDone && <span className="ml-auto text-[10px] text-green-400 font-semibold flex items-center gap-1"><Check size={10}/> Detected</span>}
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={url} onChange={e => setUrl(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') detectBrand(); }}
-            placeholder="yourstore.com"
-            className="flex-1 px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm placeholder-white/20 focus:outline-none focus:border-yellow-400/40"
-          />
-          <button onClick={detectBrand} disabled={detecting || !url.trim()}
-            className="px-3 py-2.5 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 text-black font-bold rounded-lg flex items-center gap-1.5 text-sm transition-colors whitespace-nowrap">
-            {detecting ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-            {detecting ? 'Detecting…' : 'Detect'}
-          </button>
-        </div>
-        {brandDone && <p className="text-xs text-green-400/70">Brand "{brandName}" detected and applied ✓</p>}
-        {brandError && <p className="text-xs text-red-400">{brandError}</p>}
-      </div>
-
-      {/* ── File Analyst ── */}
-      <FileAnalystSection />
-
-      {/* ── Divider ── */}
-      <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-white/[0.05]" />
-        <span className="text-[10px] text-white/20 uppercase tracking-widest">or / and</span>
-        <div className="h-px flex-1 bg-white/[0.05]" />
-      </div>
-
-      {/* ── Meta section ── */}
-      <div className="border border-white/[0.07] rounded-xl p-4 space-y-3 bg-white/[0.02]">
-        <div className="flex items-center gap-2">
-          <Globe size={13} className="text-[#1877F2]" />
-          <span className="text-sm font-bold text-white">Connect Meta Ads</span>
-          {metaConnected && <span className="ml-auto text-[10px] text-green-400 font-semibold flex items-center gap-1"><Check size={10}/> {accounts.length} account{accounts.length !== 1 ? 's' : ''}</span>}
-        </div>
-        {!metaConnected ? (
-          <div className="flex gap-2">
-            <input
-              value={token} onChange={e => setToken(e.target.value)}
-              placeholder="Paste your Meta access token…"
-              className="flex-1 px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-lg text-white text-xs font-mono placeholder-white/20 focus:outline-none focus:border-yellow-400/40"
-            />
-            <button onClick={connectMeta} disabled={metaLoading || !token.trim()}
-              className="px-3 py-2.5 bg-[#1877F2] hover:bg-[#1565d8] disabled:opacity-40 text-white font-bold rounded-lg flex items-center gap-1.5 text-sm transition-colors whitespace-nowrap">
-              {metaLoading ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
-              {metaLoading ? 'Connecting…' : 'Connect'}
-            </button>
+      {/* Step indicator */}
+      <div className="flex items-center gap-0">
+        {steps.map((label, i) => (
+          <div key={label} className="flex items-center" style={{ flex: i < steps.length - 1 ? 1 : undefined }}>
+            <div className="flex items-center gap-1.5">
+              <div style={{
+                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                background: subStep > i ? '#22c55e' : subStep === i ? '#F0B429' : 'rgba(255,255,255,0.07)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {subStep > i
+                  ? <Check size={11} style={{ color: '#000' }} />
+                  : <span style={{ fontSize: 10, fontWeight: 900, color: subStep === i ? '#000' : 'rgba(255,255,255,0.3)' }}>{i + 1}</span>
+                }
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: subStep >= i ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>
+                {label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div style={{ flex: 1, height: 1, background: subStep > i ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.06)', margin: '0 8px' }} />
+            )}
           </div>
-        ) : (
-          <div className="space-y-2">
+        ))}
+      </div>
+
+      {/* ── Sub-Step 0: Brand DNA ── */}
+      {subStep === 0 && (
+        <>
+          <div className="border border-white/[0.07] rounded-xl p-4 space-y-3 bg-white/[0.02]">
+            <div className="flex items-center gap-2">
+              <Globe size={13} className="text-yellow-400" />
+              <span className="text-sm font-bold text-white">Brand DNA</span>
+              {brandDone && <span className="ml-auto text-[10px] text-green-400 font-semibold flex items-center gap-1"><Check size={10}/> Detected</span>}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={url} onChange={e => setUrl(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') detectBrand(); }}
+                placeholder="yourstore.com"
+                className="flex-1 px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm placeholder-white/20 focus:outline-none focus:border-yellow-400/40"
+              />
+              <button onClick={detectBrand} disabled={detecting || !url.trim()}
+                className="px-3 py-2.5 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 text-black font-bold rounded-lg flex items-center gap-1.5 text-sm transition-colors whitespace-nowrap">
+                {detecting ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                {detecting ? 'Detecting…' : 'Detect'}
+              </button>
+            </div>
+            {brandDone && <p className="text-xs text-green-400/70">Brand "{brandName}" detected ✓ — AI-powered tone & keywords extracted</p>}
+            {brandError && <p className="text-xs text-red-400">{brandError}</p>}
+          </div>
+
+          <FileAnalystSection />
+
+          <button
+            onClick={() => setSubStep(1)}
+            className="w-full py-3.5 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all"
+          >
+            {brandDone ? 'Next: Connect Meta Ads' : 'Skip Brand → Connect Meta'} <ArrowRight size={16} />
+          </button>
+        </>
+      )}
+
+      {/* ── Sub-Step 1: Meta Connection ── */}
+      {subStep === 1 && (
+        <>
+          <div className="border border-white/[0.07] rounded-xl p-4 space-y-3 bg-white/[0.02]">
+            <div className="flex items-center gap-2">
+              <Globe size={13} className="text-[#1877F2]" />
+              <span className="text-sm font-bold text-white">Connect Meta Ads</span>
+            </div>
+
+            <p className="text-xs text-white/40 leading-relaxed">
+              Grant <span className="text-white/60 font-medium">ads_management, ads_read, business_management</span> permissions to pull real-time stats and push changes.
+            </p>
+
+            {/* Primary: Facebook OAuth button */}
+            {hasFBAppId && (
+              <button
+                onClick={handleFBLogin}
+                disabled={metaLoading}
+                style={{
+                  width: '100%', padding: '12px 0',
+                  background: metaLoading ? 'rgba(24,119,242,0.5)' : '#1877F2',
+                  border: 'none', borderRadius: 12,
+                  color: '#fff', fontWeight: 900, fontSize: 14,
+                  cursor: metaLoading ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  transition: 'background 0.2s',
+                }}
+              >
+                {metaLoading
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                }
+                {metaLoading ? 'Connecting…' : 'Login with Facebook'}
+              </button>
+            )}
+
+            {/* Divider */}
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-white/[0.05]" />
+              <span className="text-[10px] text-white/20 uppercase tracking-widest">
+                {hasFBAppId ? 'or paste token manually' : 'paste Meta access token'}
+              </span>
+              <div className="h-px flex-1 bg-white/[0.05]" />
+            </div>
+
+            {/* Fallback: token paste */}
+            <div className="flex gap-2">
+              <input
+                value={token} onChange={e => setToken(e.target.value)}
+                placeholder="EAAxxxxxxxx…"
+                className="flex-1 px-3 py-2.5 bg-white/[0.04] border border-white/10 rounded-lg text-white text-xs font-mono placeholder-white/20 focus:outline-none focus:border-yellow-400/40"
+              />
+              <button
+                onClick={connectMetaToken}
+                disabled={metaLoading || !token.trim()}
+                className="px-3 py-2.5 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white font-bold rounded-lg flex items-center gap-1.5 text-sm transition-colors whitespace-nowrap border border-white/10"
+              >
+                {metaLoading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                {metaLoading ? '…' : 'Connect'}
+              </button>
+            </div>
+
+            {metaError && <p className="text-xs text-red-400">{metaError}</p>}
+          </div>
+
+          <button onClick={() => setSubStep(0)} className="text-xs text-white/30 hover:text-white/60 transition-colors">
+            ← Back to Brand DNA
+          </button>
+        </>
+      )}
+
+      {/* ── Sub-Step 2: Proof of Life / Dashboard Init ── */}
+      {subStep === 2 && (
+        <>
+          <div className="border border-white/[0.07] rounded-xl p-4 space-y-3 bg-white/[0.02]">
+            <div className="flex items-center gap-2">
+              <Check size={13} className="text-green-400" />
+              <span className="text-sm font-bold text-white">
+                {metaConnected ? `Meta Connected — ${accounts.length} account${accounts.length !== 1 ? 's' : ''}` : 'Setup Complete'}
+              </span>
+            </div>
+
+            {/* Account selector */}
             {accounts.length > 1 && (
-              <select value={selectedAccount} onChange={e => { setSelectedAccount(e.target.value); saveUserConfig({ metaAdAccountId: e.target.value }); }}
-                className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none">
+              <select
+                value={selectedAccount}
+                onChange={e => { setSelectedAccount(e.target.value); saveUserConfig({ metaAdAccountId: e.target.value }); }}
+                className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none"
+              >
                 {accounts.map(a => <option key={a.id} value={a.id} className="bg-[#0c0d12]">{a.name}</option>)}
               </select>
             )}
+
             {pages.length > 1 && (
-              <select value={selectedPage} onChange={e => { setSelectedPage(e.target.value); saveUserConfig({ metaFacebookPageId: e.target.value }); }}
-                className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none">
+              <select
+                value={selectedPage}
+                onChange={e => { setSelectedPage(e.target.value); saveUserConfig({ metaFacebookPageId: e.target.value }); }}
+                className="w-full px-3 py-2 bg-white/[0.04] border border-white/10 rounded-lg text-white text-sm focus:outline-none"
+              >
                 {pages.map(p => <option key={p.id} value={p.id} className="bg-[#0c0d12]">{p.name}</option>)}
               </select>
             )}
-          </div>
-        )}
-        {metaError && <p className="text-xs text-red-400">{metaError}</p>}
-      </div>
 
-      <button onClick={handleDone}
-        className="w-full py-3.5 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all">
-        Go to Dashboard <ArrowRight size={16} />
-      </button>
+            {/* Proof of Life stats */}
+            {statsLoading && (
+              <div className="flex items-center gap-2.5 py-2">
+                <Loader2 size={13} className="animate-spin text-yellow-400" />
+                <span className="text-white/40 text-xs">Pulling live stats…</span>
+              </div>
+            )}
+
+            {proofStats && !statsLoading && (
+              <div className="space-y-2">
+                <div className="text-[10px] text-green-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+                  Live stats confirmed — last 30 days
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <StatPill label="Spend" value={`$${proofStats.spend.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
+                  <StatPill label="CTR" value={`${proofStats.ctr.toFixed(2)}%`} color="#818cf8" />
+                  <StatPill label="ROAS" value={proofStats.roas > 0 ? proofStats.roas.toFixed(2) + 'x' : '—'} color="#22c55e" />
+                  <StatPill label="Impressions" value={proofStats.impressions > 1000 ? `${(proofStats.impressions / 1000).toFixed(1)}K` : String(proofStats.impressions)} color="#22d3ee" />
+                </div>
+              </div>
+            )}
+
+            {!statsLoading && !proofStats && metaConnected && (
+              <p className="text-xs text-white/30">No stats data yet — this account may have no recent campaign activity.</p>
+            )}
+          </div>
+
+          <button
+            onClick={handleDone}
+            className="w-full py-3.5 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-yellow-400/20"
+          >
+            Go to Dashboard <ArrowRight size={16} />
+          </button>
+        </>
+      )}
     </div>
   );
 }

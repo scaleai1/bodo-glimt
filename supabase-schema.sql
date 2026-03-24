@@ -222,3 +222,112 @@ grant select, insert,         delete on public.chat_history to authenticated;
 --
 -- All three tables should show rowsecurity = true.
 -- SELECT * FROM public.profiles returns only the calling user's own row.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TABLE 4 — ad_stats_cache
+-- Stores the latest fetched Meta Ads Insights per user per date preset.
+-- Updated by the sync-meta-stats Edge Function or client-side on each fetch.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create table if not exists public.ad_stats_cache (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users(id) on delete cascade,
+  date_preset text        not null default 'last_30d',
+  data        jsonb       not null default '{}',
+  synced_at   timestamptz not null default now()
+);
+
+-- One row per user per preset
+create unique index if not exists ad_stats_cache_user_preset_idx
+  on public.ad_stats_cache(user_id, date_preset);
+
+create index if not exists ad_stats_cache_user_id_idx on public.ad_stats_cache(user_id);
+
+alter table public.ad_stats_cache enable row level security;
+
+drop policy if exists "Users can view their own stats cache"   on public.ad_stats_cache;
+drop policy if exists "Users can insert their own stats cache" on public.ad_stats_cache;
+drop policy if exists "Users can update their own stats cache" on public.ad_stats_cache;
+
+create policy "Users can view their own stats cache"
+  on public.ad_stats_cache for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own stats cache"
+  on public.ad_stats_cache for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own stats cache"
+  on public.ad_stats_cache for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+grant select, insert, update on public.ad_stats_cache to authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Domain uniqueness & verification columns on profiles
+-- One website URL per registered brand (prevents two accounts on same domain).
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table public.profiles
+  add column if not exists domain_normalized text not null default '',
+  add column if not exists domain_verified   boolean not null default false;
+
+-- Partial unique index: only enforce uniqueness for completed, non-empty domains
+create unique index if not exists profiles_domain_normalized_idx
+  on public.profiles(domain_normalized)
+  where domain_normalized != '' and onboarding_completed = true;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- VERIFICATION
+-- ─────────────────────────────────────────────────────────────────────────────
+-- After running, confirm:
+--   SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
+-- All four tables should show rowsecurity = true.
+--
+-- Confirm domain uniqueness index:
+--   SELECT indexname FROM pg_indexes WHERE tablename = 'profiles' AND indexname LIKE '%domain%';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Website Management Credentials (on profiles)
+-- Fields encrypted client-side with AES-GCM before storage (same as meta_access_token).
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table public.profiles
+  add column if not exists site_admin_api_key  text not null default '',
+  add column if not exists site_platform_type  text not null default '',   -- 'shopify' | 'woocommerce' | 'custom'
+  add column if not exists site_api_url        text not null default '';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TABLE 5 — audit_logs
+-- Records every AI data-access event for user transparency.
+-- Protected by RLS: users only see their own events.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create table if not exists public.audit_logs (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users(id) on delete cascade,
+  event_type  text        not null,   -- 'meta_data_access' | 'site_data_access' | 'token_decrypt'
+  agent_id    text        not null,   -- 'analyst' | 'orchestrator' | 'creative' | 'campaigner'
+  resource    text        not null,   -- 'meta_insights' | 'shopify_orders' | 'woo_inventory' etc
+  details     jsonb       not null default '{}',
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists audit_logs_user_id_idx    on public.audit_logs(user_id);
+create index if not exists audit_logs_created_at_idx on public.audit_logs(created_at desc);
+
+alter table public.audit_logs enable row level security;
+
+drop policy if exists "Users can view their own audit logs"   on public.audit_logs;
+drop policy if exists "Users can insert their own audit logs" on public.audit_logs;
+
+create policy "Users can view their own audit logs"
+  on public.audit_logs for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own audit logs"
+  on public.audit_logs for insert
+  with check (auth.uid() = user_id);
+
+grant select, insert on public.audit_logs to authenticated;

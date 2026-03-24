@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { getUserConfig, saveUserConfig } from '../lib/userConfig';
 import {
   FONT_CONFIGS,
   applyBrand,
@@ -171,6 +172,129 @@ const FontPicker: React.FC<{ value: FontStyle; onChange: (v: FontStyle) => void 
   </div>
 );
 
+// ─── Site Credentials Panel ────────────────────────────────────────────────────
+
+const PLATFORM_LABELS: Record<string, string> = {
+  shopify:     'Shopify (Admin API)',
+  woocommerce: 'WooCommerce (REST API)',
+  custom:      'Custom REST API',
+};
+
+const SiteCredentialsPanel: React.FC = () => {
+  const cfg = getUserConfig();
+  const [platform, setPlatform] = useState(cfg.sitePlatformType || '');
+  const [apiUrl,   setApiUrl]   = useState(cfg.siteApiUrl || '');
+  const [apiKey,   setApiKey]   = useState('');
+  const [testing,  setTesting]  = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'ok' | 'error'>('idle');
+  const [testMsg,  setTestMsg]  = useState('');
+  const [saved,    setSaved]    = useState(false);
+
+  const handleSave = async () => {
+    if (!platform || !apiUrl) return;
+    let keyToStore = cfg.siteAdminApiKey;
+    if (apiKey.trim()) {
+      const { encryptToken } = await import('../lib/tokenCrypto');
+      keyToStore = await encryptToken(apiKey.trim(), apiUrl.trim());
+    }
+    saveUserConfig({ sitePlatformType: platform, siteApiUrl: apiUrl.trim(), siteAdminApiKey: keyToStore });
+    setSaved(true); setApiKey('');
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handleTest = async () => {
+    if (!platform || !apiUrl || !apiKey.trim()) {
+      setTestStatus('error'); setTestMsg('Fill in all fields before testing.'); return;
+    }
+    setTesting(true); setTestStatus('idle');
+    try {
+      const { checkConnectivity } = await import('../lib/siteManager');
+      const r = await checkConnectivity({ platform: platform as 'shopify' | 'woocommerce' | 'custom', apiUrl, apiKey: apiKey.trim() });
+      setTestStatus(r.connected ? 'ok' : 'error');
+      setTestMsg(r.connected ? (r.shopName ? `Connected — ${r.shopName}` : 'Connection successful') : (r.error ?? 'Connection failed'));
+    } catch (e) {
+      setTestStatus('error'); setTestMsg(e instanceof Error ? e.message : 'Error');
+    } finally { setTesting(false); }
+  };
+
+  return (
+    <div className="rounded border p-5 space-y-4" style={{ background: 'var(--brand-surface-card)', borderColor: 'var(--brand-muted)' }}>
+      <div>
+        <h3 className="text-white font-black text-sm uppercase tracking-widest mb-1">Website Integration</h3>
+        <p className="text-[10px] font-mono" style={{ color: '#6b7280' }}>
+          Connect your store for revenue correlation, inventory alerts, and ROAS validation. Credentials are AES-256 encrypted before storage.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-mono uppercase tracking-widest" style={{ color: '#6b7280' }}>Platform</label>
+        <select value={platform} onChange={e => { setPlatform(e.target.value); setTestStatus('idle'); }}
+          className="w-full rounded border px-3 py-2.5 text-sm text-white outline-none"
+          style={{ borderColor: 'var(--brand-muted)', background: 'rgba(0,0,0,0.3)' }}>
+          <option value="" className="bg-[#0c0d12]">Select platform…</option>
+          {Object.entries(PLATFORM_LABELS).map(([v, l]) => <option key={v} value={v} className="bg-[#0c0d12]">{l}</option>)}
+        </select>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-mono uppercase tracking-widest" style={{ color: '#6b7280' }}>
+          {platform === 'shopify' ? 'Store URL' : platform === 'woocommerce' ? 'WordPress URL' : 'API Base URL'}
+        </label>
+        <input type="text" value={apiUrl} onChange={e => { setApiUrl(e.target.value); setTestStatus('idle'); }}
+          placeholder={platform === 'shopify' ? 'https://mystore.myshopify.com' : 'https://mystore.com'}
+          className="w-full rounded border px-3 py-2.5 text-sm text-white bg-transparent outline-none font-mono"
+          style={{ borderColor: 'var(--brand-muted)' }} />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-mono uppercase tracking-widest" style={{ color: '#6b7280' }}>
+          {platform === 'shopify' ? 'Admin Access Token' : platform === 'woocommerce' ? 'Consumer Key:Secret' : 'Bearer Token'}
+          <span className="ml-2 text-yellow-500/60">🔒 encrypted</span>
+        </label>
+        <input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); setTestStatus('idle'); }}
+          placeholder={cfg.siteAdminApiKey ? '••••••  (saved — enter new to replace)' : platform === 'woocommerce' ? 'ck_xxxx:cs_xxxx' : 'Enter token…'}
+          className="w-full rounded border px-3 py-2.5 text-sm text-white bg-transparent outline-none font-mono"
+          style={{ borderColor: 'var(--brand-muted)' }} autoComplete="new-password" />
+      </div>
+
+      {testStatus !== 'idle' && (
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+          background: testStatus === 'ok' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+          border: `1px solid ${testStatus === 'ok' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+          color: testStatus === 'ok' ? '#10b981' : '#ef4444',
+        }}>
+          {testStatus === 'ok' ? '✓ ' : '✗ '}{testMsg}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={handleTest} disabled={testing || !platform || !apiUrl || !apiKey.trim()}
+          className="flex-1 py-2.5 rounded text-xs font-bold uppercase tracking-widest disabled:opacity-40"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+          {testing ? '⏳ Testing…' : 'Test Connection'}
+        </button>
+        <button onClick={handleSave} disabled={!platform || !apiUrl}
+          className="flex-1 py-2.5 rounded text-xs font-black uppercase tracking-widest disabled:opacity-40"
+          style={{
+            background: saved ? 'rgba(16,185,129,0.15)' : 'color-mix(in srgb, var(--brand-primary) 20%, transparent)',
+            border: `1px solid ${saved ? 'rgba(16,185,129,0.4)' : 'color-mix(in srgb, var(--brand-primary) 40%, transparent)'}`,
+            color: saved ? '#10b981' : 'var(--brand-primary)',
+          }}>
+          {saved ? '✓ Saved' : 'Save Credentials'}
+        </button>
+      </div>
+
+      {cfg.siteApiUrl && (
+        <div className="flex items-center gap-2">
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 5px #10b981' }} />
+          <span style={{ fontSize: 10, color: '#10b981' }}>Active: {cfg.siteApiUrl} ({cfg.sitePlatformType})</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export const BrandingSettings: React.FC = () => {
@@ -329,6 +453,9 @@ export const BrandingSettings: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Website Integration */}
+      <SiteCredentialsPanel />
 
       {/* Active brand */}
       <div className="space-y-3">

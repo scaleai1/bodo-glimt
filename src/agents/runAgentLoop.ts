@@ -6,6 +6,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ClaudeToolDefinition, AgentAction, AgentId } from './types';
 import { supabase } from '../lib/supabase';
 import { decryptToken } from '../lib/tokenCrypto';
+import { domainsMatch } from '../lib/siteManager';
 
 function getClient() {
   return new Anthropic({
@@ -51,15 +52,28 @@ export async function runAgentLoop({
   // Fetch user profile, decrypt the stored Meta token, inject into system prompt
   const { data: rawProfile } = await supabase
     .from('profiles')
-    .select('brand_name, website_url, brand_colors, industry, tone, keywords, meta_access_token, meta_ad_account_id, meta_facebook_page_id, meta_instagram_account_id')
+    .select('brand_name, website_url, brand_colors, industry, tone, keywords, meta_access_token, meta_ad_account_id, meta_facebook_page_id, meta_instagram_account_id, site_admin_api_key, site_platform_type, site_api_url')
     .eq('id', session.user.id)
     .single();
+
+  // ── Domain validation: site_api_url must match website_url ──────────────────
+  if (rawProfile?.site_api_url && rawProfile?.website_url) {
+    if (!domainsMatch(rawProfile.website_url as string, rawProfile.site_api_url as string)) {
+      throw new Error(
+        `Security: site_api_url domain does not match the onboarding website_url. ` +
+        `Expected domain: ${new URL(rawProfile.website_url.startsWith('http') ? rawProfile.website_url : `https://${rawProfile.website_url}`).hostname}`,
+      );
+    }
+  }
 
   const profile = rawProfile
     ? {
         ...rawProfile,
         meta_access_token: rawProfile.meta_access_token
           ? await decryptToken(rawProfile.meta_access_token as string, session.user.id)
+          : '',
+        site_admin_api_key: rawProfile.site_admin_api_key
+          ? await decryptToken(rawProfile.site_admin_api_key as string, session.user.id)
           : '',
       }
     : null;
@@ -122,6 +136,15 @@ export async function runAgentLoop({
           });
 
           onAction({ agentId, label: formatToolLabel(block.name, block.input as Record<string, unknown>), status: 'success', detail: resultStr.slice(0, 120) });
+
+          // Write audit log for data-access tools
+          const dataAccessTools = ['fetch_meta_insights', 'fetch_order_stats', 'fetch_inventory_alerts', 'run_roas_validation'];
+          if (dataAccessTools.includes(block.name) && session) {
+            void writeAuditLog(session.user.id, agentId, block.name, {
+              input:       block.input,
+              resultBytes: resultStr.length,
+            });
+          }
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
           toolResults.push({
@@ -181,6 +204,10 @@ function formatToolLabel(name: string, input: Record<string, unknown>): string {
     generate_captions:       'Writing captions',
     get_brand_context:       'Loading brand profile',
     fetch_active_ad_sets:    'Fetching active ad sets',
+    fetch_meta_insights:     'Fetching Meta insights',
+    fetch_order_stats:       'Fetching website orders',
+    fetch_inventory_alerts:  'Checking inventory alerts',
+    run_roas_validation:     'Running ROAS validation',
     upload_ad_image:         'Uploading image to Meta',
     create_ad_creative:      'Creating ad creative',
     add_creative_to_ad_set:  'Adding creative to ad set',
@@ -202,4 +229,25 @@ function formatToolLabel(name: string, input: Record<string, unknown>): string {
     return `${base}: "${val}"`;
   }
   return base;
+}
+
+// ─── Audit Logging ────────────────────────────────────────────────────────────
+
+async function writeAuditLog(
+  userId:    string,
+  agentId:   AgentId,
+  resource:  string,
+  details:   Record<string, unknown>,
+): Promise<void> {
+  try {
+    await supabase.from('audit_logs').insert({
+      user_id:    userId,
+      event_type: resource.startsWith('site') ? 'site_data_access' : 'meta_data_access',
+      agent_id:   agentId,
+      resource,
+      details,
+    });
+  } catch {
+    // Audit log failure is non-fatal — never block agent execution
+  }
 }
