@@ -1,18 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './pages/Dashboard';
 import OnboardingPage from './pages/OnboardingPage';
-import { getUserConfig, clearUserConfig } from './lib/userConfig';
+import { getUserConfig, saveUserConfig, clearUserConfig } from './lib/userConfig';
+import { supabase } from './lib/supabase';
 import './index.css';
 
 function App() {
   const [view, setView] = useState<'onboarding' | 'dashboard'>(() => {
-    // Force onboarding via hash (useful for re-running it intentionally)
     if (window.location.hash === '#onboarding') return 'onboarding';
-    // Already completed onboarding
     if (getUserConfig().completed) return 'dashboard';
-    // New client → show onboarding
     return 'onboarding';
   });
+
+  useEffect(() => {
+    // Handle return from Facebook OAuth — Supabase fires SIGNED_IN on redirect
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Save Meta access token from Facebook provider
+        if (session.provider_token) {
+          saveUserConfig({ metaAccessToken: session.provider_token });
+        }
+        saveUserConfig({ completed: true });
+        setView('dashboard');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (view === 'onboarding') {
     return (

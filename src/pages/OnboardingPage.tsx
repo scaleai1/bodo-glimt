@@ -7,94 +7,8 @@ import {
 import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/BrandingService';
 import { scanBrand, saveBrand as saveBrandProfile } from '../lib/brandContext';
 import { getUserConfig, saveUserConfig } from '../lib/userConfig';
-import { discoverAllAssets, mapAssetsToConfig } from '../lib/discoverAssets';
+import { supabase } from '../lib/supabase';
 import Anthropic from '@anthropic-ai/sdk';
-
-// ── Facebook SDK (OAuth login) ─────────────────────────────────────────────
-
-declare global {
-  interface Window {
-    fbAsyncInit?: () => void;
-    FB?: {
-      init: (config: { appId: string; version: string; cookie?: boolean; xfbml?: boolean }) => void;
-      login: (
-        cb: (r: { authResponse?: { accessToken: string; userID: string } }) => void,
-        opts?: { scope?: string },
-      ) => void;
-    };
-  }
-}
-
-let _fbSdkReady = false;
-
-async function loadFBSdk(): Promise<void> {
-  if (_fbSdkReady) return;
-  const appId = (import.meta.env.VITE_META_APP_ID as string | undefined) ?? '';
-  if (!appId) throw new Error('NO_APP_ID');
-  if (window.FB) { _fbSdkReady = true; return; }
-
-  return new Promise<void>(resolve => {
-    window.fbAsyncInit = () => {
-      window.FB!.init({ appId, version: 'v20.0', cookie: false, xfbml: false });
-      _fbSdkReady = true;
-      resolve();
-    };
-    if (!document.getElementById('fb-sdk-script')) {
-      const s    = document.createElement('script');
-      s.id       = 'fb-sdk-script';
-      s.src      = 'https://connect.facebook.net/en_US/sdk.js';
-      s.async    = true;
-      s.crossOrigin = 'anonymous';
-      document.head.appendChild(s);
-    }
-  });
-}
-
-// Full omni-channel scope
-const FB_SCOPE = [
-  'ads_management', 'ads_read', 'business_management',
-  'pages_read_engagement', 'pages_manage_posts',
-  'instagram_basic', 'instagram_content_publish',
-  'whatsapp_business_management',
-].join(',');
-
-async function fbOAuthLogin(): Promise<string> {
-  await loadFBSdk();
-  return new Promise<string>((resolve, reject) => {
-    window.FB!.login(
-      res => {
-        if (res.authResponse?.accessToken) resolve(res.authResponse.accessToken);
-        else reject(new Error('Facebook login was cancelled or permissions denied.'));
-      },
-      { scope: FB_SCOPE },
-    );
-  });
-}
-
-// ── Meta Graph API ────────────────────────────────────────────────────────────
-
-const META_GRAPH = 'https://graph.facebook.com/v20.0';
-
-interface MetaAccount { id: string; name: string; account_id: string; currency: string; }
-interface MetaPage    { id: string; name: string; }
-
-async function fetchAdAccounts(token: string): Promise<MetaAccount[]> {
-  const res = await fetch(
-    `${META_GRAPH}/me/adaccounts?fields=name,account_id,currency&limit=50&access_token=${token}`,
-  );
-  if (!res.ok) throw new Error(`Meta ${res.status}`);
-  const json = await res.json() as { data?: MetaAccount[] };
-  return json.data ?? [];
-}
-
-async function fetchPages(token: string): Promise<MetaPage[]> {
-  const res = await fetch(
-    `${META_GRAPH}/me/accounts?fields=name&limit=50&access_token=${token}`,
-  );
-  if (!res.ok) return [];
-  const json = await res.json() as { data?: MetaPage[] };
-  return json.data ?? [];
-}
 
 // ── Persist platform mappings (local + Supabase) ──────────────────────────────
 
@@ -463,36 +377,34 @@ function FileAnalystSection() {
 // Below: Facebook login + Instagram login (full omni-channel OAuth).
 
 interface WelcomeStepProps {
-  onStart:     () => void;   // no OAuth — go straight to URL step
-  onLoginDone: () => void;   // OAuth success — go to URL step
-  onSkip:      () => void;
+  onSkip: () => void;
 }
 
-function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
+function WelcomeStep({ onSkip }: WelcomeStepProps) {
   const [loginLoading, setLoginLoading] = useState<'fb' | 'ig' | null>(null);
+  const [loginError,   setLoginError]   = useState('');
   const isLoading = loginLoading !== null;
 
-  async function handleSocialLogin(platform: 'fb' | 'ig') {
-    setLoginLoading(platform);
-    try {
-      const token = await fbOAuthLogin();
-      const [accs, pgs] = await Promise.all([
-        fetchAdAccounts(token).catch(() => [] as MetaAccount[]),
-        fetchPages(token).catch(() => [] as MetaPage[]),
-      ]);
-      saveUserConfig({
-        metaAccessToken:    token,
-        metaAdAccountId:    accs[0]?.id ?? '',
-        metaFacebookPageId: pgs[0]?.id  ?? '',
-      });
-      void discoverAllAssets(token).then(assets => {
-        saveUserConfig(mapAssetsToConfig(assets));
-      }).catch(() => {});
-      onLoginDone();
-    } catch {
-      // OAuth not configured — go straight to URL step
-      onStart();
-    } finally { setLoginLoading(null); }
+  async function handleSocialLogin(_platform: 'fb' | 'ig') {
+    setLoginLoading('fb');
+    setLoginError('');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: {
+        scopes: [
+          'ads_management', 'ads_read', 'business_management',
+          'pages_read_engagement', 'pages_manage_posts',
+          'instagram_basic', 'instagram_content_publish',
+          'whatsapp_business_management',
+        ].join(','),
+        redirectTo: window.location.href.split('#')[0],
+      },
+    });
+    if (error) {
+      setLoginError(error.message);
+      setLoginLoading(null);
+    }
+    // If no error: page redirects to Facebook — no further code runs here
   }
 
   return (
@@ -598,6 +510,11 @@ function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
             {loginLoading === 'ig' ? 'Connecting…' : 'Continue with Instagram'}
           </button>
 
+          {loginError && (
+            <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/15 rounded-lg p-2.5">
+              <AlertCircle size={12} className="shrink-0" /> {loginError}
+            </div>
+          )}
         </div>
 
       {/* Skip */}
@@ -747,8 +664,7 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const [step, setStep] = useState<0 | 1>(0);
 
   function handleSkip() {
-    saveUserConfig({ completed: true });
-    onComplete();
+    setStep(1);
   }
 
   return (
@@ -757,8 +673,6 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
         <div className="bg-[#0c0d12] border border-white/[0.06] rounded-2xl p-8 shadow-2xl overflow-y-auto max-h-full">
           {step === 0 && (
             <WelcomeStep
-              onStart={() => setStep(1)}
-              onLoginDone={() => setStep(1)}
               onSkip={handleSkip}
             />
           )}
