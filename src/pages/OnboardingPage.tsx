@@ -471,14 +471,12 @@ interface WelcomeStepProps {
 function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
   const [loginLoading, setLoginLoading] = useState<'fb' | 'ig' | null>(null);
   const [loginError,   setLoginError]   = useState('');
-  const hasFBAppId = !!(import.meta.env.VITE_META_APP_ID as string | undefined);
   const isLoading = loginLoading !== null;
 
   async function handleSocialLogin(platform: 'fb' | 'ig') {
     setLoginLoading(platform); setLoginError('');
     try {
       const token = await fbOAuthLogin();
-      // Save token + fetch linked accounts
       const [accs, pgs] = await Promise.all([
         fetchAdAccounts(token).catch(() => [] as MetaAccount[]),
         fetchPages(token).catch(() => [] as MetaPage[]),
@@ -488,14 +486,17 @@ function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
         metaAdAccountId:    accs[0]?.id ?? '',
         metaFacebookPageId: pgs[0]?.id  ?? '',
       });
-      // Discover IG + WABA in background — non-blocking
       void discoverAllAssets(token).then(assets => {
         saveUserConfig(mapAssetsToConfig(assets));
       }).catch(() => {});
       onLoginDone();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Login failed';
-      if (msg !== 'NO_APP_ID') setLoginError(msg);
+      if (msg === 'NO_APP_ID') {
+        setLoginError('Add VITE_META_APP_ID to your .env.local file (Meta for Developers → Your App → App ID)');
+      } else {
+        setLoginError(msg);
+      }
     } finally { setLoginLoading(null); }
   }
 
@@ -546,9 +547,8 @@ function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
         Get Started <ArrowRight size={20} />
       </button>
 
-      {/* ── Social login (if FB App ID configured) ── */}
-      {hasFBAppId && (
-        <div className="space-y-3">
+      {/* ── Social login ── */}
+      <div className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-white/[0.07]" />
             <span className="text-[11px] text-white/25 font-medium">or connect directly</span>
@@ -618,7 +618,6 @@ function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
             </div>
           )}
         </div>
-      )}
 
       {/* Skip */}
       <button
