@@ -664,6 +664,8 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   // System connectivity status
   const cfg = getUserConfig();
   const metaConnected = !!(cfg.metaAccessToken || import.meta.env.VITE_META_ACCESS_TOKEN);
+  const igConnected   = !!(cfg.metaInstagramAccountId || import.meta.env.VITE_META_INSTAGRAM_ACCOUNT_ID);
+  const waConnected   = !!(cfg.wabaId || cfg.waPhoneNumbers?.length);
   const siteConnected = !!(cfg.siteApiUrl && cfg.siteAdminApiKey);
 
   return (
@@ -690,29 +692,41 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           System
         </span>
 
-        {/* Meta status */}
+        {/* FB Ads */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: metaConnected ? '#10b981' : '#4b5563',
-            boxShadow:  metaConnected ? '0 0 6px #10b981' : 'none',
-          }} />
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: metaConnected ? '#10b981' : '#4b5563', boxShadow: metaConnected ? '0 0 6px #10b981' : 'none' }} />
           <span style={{ fontSize: 11, color: metaConnected ? '#10b981' : '#6b7280', fontWeight: 600 }}>
-            Meta Ads: {metaConnected ? 'Connected' : 'Not configured'}
+            FB Ads: {metaConnected ? 'On' : 'Off'}
           </span>
         </div>
 
         <span style={{ color: '#374151', fontSize: 10 }}>|</span>
 
-        {/* Website status */}
+        {/* Instagram */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: siteConnected ? '#10b981' : '#4b5563',
-            boxShadow:  siteConnected ? '0 0 6px #10b981' : 'none',
-          }} />
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: igConnected ? '#10b981' : '#4b5563', boxShadow: igConnected ? '0 0 6px #10b981' : 'none' }} />
+          <span style={{ fontSize: 11, color: igConnected ? '#10b981' : '#6b7280', fontWeight: 600 }}>
+            IG: {igConnected ? 'On' : 'Off'}
+          </span>
+        </div>
+
+        <span style={{ color: '#374151', fontSize: 10 }}>|</span>
+
+        {/* WhatsApp */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: waConnected ? '#10b981' : '#4b5563', boxShadow: waConnected ? '0 0 6px #10b981' : 'none' }} />
+          <span style={{ fontSize: 11, color: waConnected ? '#10b981' : '#6b7280', fontWeight: 600 }}>
+            WA: {waConnected ? 'On' : 'Off'}
+          </span>
+        </div>
+
+        <span style={{ color: '#374151', fontSize: 10 }}>|</span>
+
+        {/* Shopify / Website */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: siteConnected ? '#10b981' : '#4b5563', boxShadow: siteConnected ? '0 0 6px #10b981' : 'none' }} />
           <span style={{ fontSize: 11, color: siteConnected ? '#10b981' : '#6b7280', fontWeight: 600 }}>
-            Website Management: {siteConnected ? `Connected (${cfg.sitePlatformType || 'custom'})` : 'Not configured'}
+            {siteConnected ? `${cfg.sitePlatformType || 'Store'}: On` : 'Store: Off'}
           </span>
         </div>
 
@@ -721,7 +735,7 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         {/* TikTok placeholder */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#374151' }} />
-          <span style={{ fontSize: 11, color: '#4b5563', fontWeight: 600 }}>TikTok Ads: Soon™</span>
+          <span style={{ fontSize: 11, color: '#4b5563', fontWeight: 600 }}>TikTok: Soon™</span>
         </div>
 
         {/* Correlation Analysis button */}

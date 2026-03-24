@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getUserConfig, saveUserConfig } from '../lib/userConfig';
+import { discoverAllAssets, mapAssetsToConfig } from '../lib/discoverAssets';
 import {
   FONT_CONFIGS,
   applyBrand,
@@ -306,6 +307,10 @@ export const BrandingSettings: React.FC = () => {
   const [applied, setApplied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Sync All Assets state
+  const [syncStatus,  setSyncStatus]  = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
+  const [syncSummary, setSyncSummary] = useState('');
+
   useEffect(() => { applyBrand(current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleResolve = async () => {
@@ -346,6 +351,31 @@ export const BrandingSettings: React.FC = () => {
     setUrl('');
     setApplied(false);
     setError(null);
+  };
+
+  const handleSyncAssets = async () => {
+    const cfg = getUserConfig();
+    const token = cfg.metaAccessToken || (import.meta.env.VITE_META_ACCESS_TOKEN as string | undefined) || '';
+    if (!token) { setSyncStatus('error'); setSyncSummary('No Meta access token found. Connect Meta Ads first.'); return; }
+    setSyncStatus('syncing'); setSyncSummary('');
+    try {
+      const assets = await discoverAllAssets(token);
+      const mapped = mapAssetsToConfig(assets);
+      saveUserConfig({
+        metaInstagramAccountId: mapped.metaInstagramAccountId,
+        wabaId:                 mapped.wabaId,
+        waPhoneNumbers:         mapped.waPhoneNumbers,
+      });
+      const parts: string[] = [];
+      if (assets.pages.length)             parts.push(`${assets.pages.length} FB page${assets.pages.length > 1 ? 's' : ''}`);
+      if (assets.instagramAccounts.length) parts.push(`${assets.instagramAccounts.length} IG account${assets.instagramAccounts.length > 1 ? 's' : ''}`);
+      if (assets.wabas.length)             parts.push(`${assets.wabas.length} WABA${assets.wabas.length > 1 ? 's' : ''}`);
+      setSyncSummary(parts.length ? `Found: ${parts.join(', ')}` : 'No linked assets discovered');
+      setSyncStatus('done');
+    } catch (e) {
+      setSyncSummary(e instanceof Error ? e.message : 'Sync failed');
+      setSyncStatus('error');
+    }
   };
 
   const isInstagram = url.trim().includes('instagram.com') || url.trim().startsWith('@');
@@ -456,6 +486,38 @@ export const BrandingSettings: React.FC = () => {
 
       {/* Website Integration */}
       <SiteCredentialsPanel />
+
+      {/* Sync All Assets */}
+      <div className="space-y-3">
+        <p className="text-[10px] font-mono uppercase tracking-widest" style={{ color: '#6b7280' }}>Omni-Channel Assets</p>
+        <div
+          className="rounded border p-4 space-y-3"
+          style={{ background: 'var(--brand-surface-card)', borderColor: 'var(--brand-muted)' }}
+        >
+          <p className="text-xs" style={{ color: '#9ca3af' }}>
+            Re-discovers your linked Facebook Pages, Instagram Business Accounts, and WhatsApp Business Accounts from Meta and updates the platform mapping.
+          </p>
+          <button
+            onClick={handleSyncAssets}
+            disabled={syncStatus === 'syncing'}
+            className="w-full py-2.5 rounded text-xs font-black uppercase tracking-widest disabled:opacity-50"
+            style={{
+              background:  syncStatus === 'done'  ? 'rgba(16,185,129,0.12)'
+                         : syncStatus === 'error' ? 'rgba(239,68,68,0.1)'
+                         : 'color-mix(in srgb, var(--brand-primary) 15%, transparent)',
+              border: `1px solid ${syncStatus === 'done' ? 'rgba(16,185,129,0.4)' : syncStatus === 'error' ? 'rgba(239,68,68,0.35)' : 'color-mix(in srgb, var(--brand-primary) 35%, transparent)'}`,
+              color:  syncStatus === 'done' ? '#10b981' : syncStatus === 'error' ? '#ef4444' : 'var(--brand-primary)',
+            }}
+          >
+            {syncStatus === 'syncing' ? '⏳ Syncing…' : syncStatus === 'done' ? '✓ Sync Complete' : syncStatus === 'error' ? '✗ Sync Failed' : '⟳ Sync All Assets'}
+          </button>
+          {syncSummary && (
+            <p className="text-[11px] font-mono" style={{ color: syncStatus === 'error' ? '#ef4444' : '#6b7280' }}>
+              {syncSummary}
+            </p>
+          )}
+        </div>
+      </div>
 
       {/* Active brand */}
       <div className="space-y-3">

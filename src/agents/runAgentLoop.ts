@@ -58,9 +58,13 @@ export async function runAgentLoop({
 
   // ── Platform mapping lock: if a verified mapping exists, ensure IDs haven't drifted ──
   const mapping = rawProfile?.platform_mappings as {
-    metaAdAccount?: string;
-    website?:       string;
-    lockedAt?:      string;
+    metaAdAccount?:       string;
+    metaPage?:            string;
+    instagramBusinessId?: string;
+    wabaId?:              string;
+    waPhoneNumbers?:      string[];
+    website?:             string;
+    lockedAt?:            string;
   } | null | undefined;
   if (mapping?.lockedAt && mapping.metaAdAccount) {
     const currentAccountId = rawProfile?.meta_ad_account_id as string | undefined;
@@ -210,6 +214,13 @@ function buildBrandContext(profile: Record<string, unknown>): string {
   if (profile.meta_facebook_page_id)     lines.push(`- Meta Facebook Page ID: ${profile.meta_facebook_page_id}`);
   if (profile.meta_instagram_account_id) lines.push(`- Meta Instagram Account ID: ${profile.meta_instagram_account_id}`);
   if (profile.meta_access_token)         lines.push(`- Meta Access Token: ${profile.meta_access_token}`);
+  // Omni-channel locked IDs from platform_mappings
+  const pm = profile.platform_mappings as {
+    instagramBusinessId?: string; wabaId?: string; waPhoneNumbers?: string[];
+  } | null | undefined;
+  if (pm?.instagramBusinessId) lines.push(`- Locked Instagram Business ID: ${pm.instagramBusinessId}`);
+  if (pm?.wabaId)              lines.push(`- Locked WABA ID: ${pm.wabaId}`);
+  if (pm?.waPhoneNumbers?.length) lines.push(`- Locked WA Phone Number IDs: ${pm.waPhoneNumbers.join(', ')}`);
   return lines.join('\n');
 }
 
@@ -229,6 +240,10 @@ function formatToolLabel(name: string, input: Record<string, unknown>): string {
     add_creative_to_ad_set:  'Adding creative to ad set',
     replace_ad_creative:     'Replacing ad creative',
     publish_to_social:       'Publishing to social',
+    publish_ig_post:         'Publishing to Instagram',
+    publish_fb_post:         'Publishing to Facebook Page',
+    send_wa_template:        'Sending WhatsApp message',
+    create_omni_campaign:    'Creating omni-channel campaign',
     run_campaign_diagnosis:  'Running campaign diagnosis',
     get_scale_decisions:     'Getting scale decisions',
     get_top_performers:      'Fetching top performers',

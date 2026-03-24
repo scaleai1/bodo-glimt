@@ -1,5 +1,6 @@
 // ─── Campaigner Agent ──────────────────────────────────────────────────────────
 // Tools: Meta Ads API operations (metaAds.ts) + social publishing (socialPublisher.ts)
+//        + omni-channel (metaOmni.ts): IG direct, FB page, WhatsApp templates, omni campaign
 
 import { runAgentLoop } from '../runAgentLoop';
 import { CAMPAIGNER_SYSTEM_PROMPT } from './campaigner.prompts';
@@ -10,6 +11,8 @@ import {
 } from '../../lib/metaAds';
 import { publishToInstagram, publishToFacebook } from '../../lib/socialPublisher';
 import type { MetaCredentials } from '../../lib/socialPublisher';
+import { publishIGPost, publishFBPost, sendWATemplate, createOmniCampaign } from '../../lib/metaOmni';
+import { getUserConfig } from '../../lib/userConfig';
 import type Anthropic from '@anthropic-ai/sdk';
 
 const MODEL = 'claude-haiku-4-5-20251001';
@@ -90,18 +93,80 @@ const TOOLS: ClaudeToolDefinition[] = [
       required: ['media_url', 'caption', 'platform'],
     },
   },
+
+  // ── Omni-channel tools ──────────────────────────────────────────────────────
+
+  {
+    name: 'publish_ig_post',
+    description: 'Directly publish an image or Reel to the connected Instagram Business Account.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        image_url:  { type: 'string', description: 'Publicly accessible URL of the image or video' },
+        caption:    { type: 'string', description: 'Post caption (supports hashtags, emojis)' },
+        media_type: { type: 'string', description: 'image (default) or video (Reel)', enum: ['image', 'video'] },
+      },
+      required: ['image_url', 'caption'],
+    },
+  },
+  {
+    name: 'publish_fb_post',
+    description: 'Publish a post to the connected Facebook Page (with optional image or video).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message:    { type: 'string', description: 'Post message / copy' },
+        media_url:  { type: 'string', description: 'Optional: public URL of image or video to attach' },
+        media_type: { type: 'string', description: 'image or video (ignored if no media_url)', enum: ['image', 'video'] },
+        link:       { type: 'string', description: 'Optional: link URL for link-preview posts (no media)' },
+      },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'send_wa_template',
+    description: 'Send an approved WhatsApp template message to a phone number via the connected WABA.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        to:            { type: 'string', description: 'Recipient phone in E.164 format, e.g. "+12125551234"' },
+        template_name: { type: 'string', description: 'Pre-approved WhatsApp template name, e.g. "order_confirmation"' },
+        language_code: { type: 'string', description: 'BCP-47 language code, e.g. "en_US" or "he"' },
+      },
+      required: ['to', 'template_name', 'language_code'],
+    },
+  },
+  {
+    name: 'create_omni_campaign',
+    description: 'Create a new omni-channel ad campaign running across Facebook, Instagram, and Audience Network.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        campaign_name:      { type: 'string',  description: 'Name for the campaign' },
+        ad_set_name:        { type: 'string',  description: 'Name for the ad set' },
+        daily_budget_usd:   { type: 'number',  description: 'Daily budget in USD (e.g. 50 = $50/day)' },
+        image_hash:         { type: 'string',  description: 'Image hash from upload_ad_image' },
+        ad_message:         { type: 'string',  description: 'Ad copy / message text' },
+      },
+      required: ['campaign_name', 'ad_set_name', 'daily_budget_usd', 'image_hash', 'ad_message'],
+    },
+  },
 ];
 
 // ─── Tool executor ─────────────────────────────────────────────────────────────
 
 async function executeTool(name: string, input: Record<string, unknown>): Promise<unknown> {
-  const adAccountId  = import.meta.env.VITE_META_AD_ACCOUNT_ID   ?? '';
-  const accessToken  = import.meta.env.VITE_META_ACCESS_TOKEN     ?? '';
-  const pageId       = import.meta.env.VITE_META_FACEBOOK_PAGE_ID ?? '';
-  const igAccountId  = import.meta.env.VITE_META_INSTAGRAM_ACCOUNT_ID ?? '';
+  // Prefer runtime config (OAuth-stored) over env vars
+  const cfg          = getUserConfig();
+  const adAccountId  = cfg.metaAdAccountId        || import.meta.env.VITE_META_AD_ACCOUNT_ID         || '';
+  const accessToken  = cfg.metaAccessToken         || import.meta.env.VITE_META_ACCESS_TOKEN           || '';
+  const pageId       = cfg.metaFacebookPageId      || import.meta.env.VITE_META_FACEBOOK_PAGE_ID      || '';
+  const igAccountId  = cfg.metaInstagramAccountId  || import.meta.env.VITE_META_INSTAGRAM_ACCOUNT_ID  || '';
+  const wabaPhones   = cfg.waPhoneNumbers;
+  const primaryWAPhone = wabaPhones[0] ?? '';
 
   if (!accessToken) {
-    throw new Error('Meta access token not configured. Set VITE_META_ACCESS_TOKEN in .env.local');
+    throw new Error('Meta access token not configured. Connect via Settings → Meta Ads or set VITE_META_ACCESS_TOKEN in .env.local');
   }
 
   switch (name) {
@@ -149,12 +214,76 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
       const creds: MetaCredentials = { accessToken, instagramAccountId: igAccountId, facebookPageId: pageId, adAccountId };
 
       if (platform === 'instagram') {
-        const postId = await publishToInstagram(mediaUrl, caption, creds, mediaType);
-        return { post_id: postId, platform: 'instagram' };
+        const result = await publishToInstagram(mediaUrl, caption, creds, mediaType);
+        return { post_id: result.postId, platform: 'instagram', success: result.success };
       } else {
-        const postId = await publishToFacebook(mediaUrl, caption, creds, mediaType);
-        return { post_id: postId, platform: 'facebook' };
+        const result = await publishToFacebook(mediaUrl, caption, creds, mediaType);
+        return { post_id: result.postId, platform: 'facebook', success: result.success };
       }
+    }
+
+    // ── Omni-channel tools ────────────────────────────────────────────────────
+
+    case 'publish_ig_post': {
+      if (!igAccountId) throw new Error('Instagram Business Account ID not configured. Run "Sync All Assets" in Settings.');
+      const mediaType = (input.media_type as 'image' | 'video') ?? 'image';
+      const result = await publishIGPost(
+        igAccountId,
+        input.image_url as string,
+        input.caption   as string,
+        accessToken,
+        mediaType,
+      );
+      return { post_id: result.postId, platform: 'instagram' };
+    }
+
+    case 'publish_fb_post': {
+      if (!pageId) throw new Error('Facebook Page ID not configured.');
+      const result = await publishFBPost(
+        pageId,
+        accessToken,
+        input.message as string,
+        {
+          mediaUrl:  input.media_url  as string | undefined,
+          mediaType: input.media_type as 'image' | 'video' | undefined,
+          link:      input.link       as string | undefined,
+        },
+      );
+      return { post_id: result.postId, platform: 'facebook' };
+    }
+
+    case 'send_wa_template': {
+      if (!primaryWAPhone) throw new Error('No WhatsApp phone number ID configured. Run "Sync All Assets" in Settings to discover your WABA.');
+      const result = await sendWATemplate(
+        primaryWAPhone,
+        input.to            as string,
+        input.template_name as string,
+        input.language_code as string,
+        accessToken,
+      );
+      return { message_id: result.messageId, status: 'sent' };
+    }
+
+    case 'create_omni_campaign': {
+      if (!pageId) throw new Error('Facebook Page ID not configured.');
+      const dailyBudgetCents = Math.round((input.daily_budget_usd as number) * 100);
+      const result = await createOmniCampaign({
+        adAccountId,
+        accessToken,
+        campaignName:     input.campaign_name as string,
+        adSetName:        input.ad_set_name   as string,
+        dailyBudgetCents,
+        pageId,
+        igAccountId:      igAccountId ?? '',
+        imageHash:        input.image_hash    as string,
+        adMessage:        input.ad_message    as string,
+      });
+      return {
+        campaign_id: result.campaignId,
+        ad_set_id:   result.adSetId,
+        status:      'PAUSED',
+        note:        'Campaign created in PAUSED state. Review and activate via Meta Ads Manager.',
+      };
     }
 
     default:

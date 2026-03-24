@@ -7,6 +7,7 @@ import {
 import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/BrandingService';
 import { scanBrand, saveBrand as saveBrandProfile } from '../lib/brandContext';
 import { getUserConfig, saveUserConfig } from '../lib/userConfig';
+import { discoverAllAssets, mapAssetsToConfig } from '../lib/discoverAssets';
 import Anthropic from '@anthropic-ai/sdk';
 import type { AdInsights } from '../lib/metaAds';
 import { fetchAccountInsights } from '../lib/metaAds';
@@ -59,7 +60,7 @@ async function fbOAuthLogin(): Promise<string> {
         if (res.authResponse?.accessToken) resolve(res.authResponse.accessToken);
         else reject(new Error('Facebook login was cancelled or permissions denied.'));
       },
-      { scope: 'ads_management,ads_read,business_management,pages_read_engagement,instagram_basic' },
+      { scope: 'ads_management,ads_read,business_management,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,whatsapp_business_management' },
     );
   });
 }
@@ -635,6 +636,9 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
   const [selectedAccount, setSelectedAccount] = useState('');
   const [selectedPage,    setSelectedPage]    = useState('');
   const [metaError,       setMetaError]       = useState('');
+  const [discoveredIgId,  setDiscoveredIgId]  = useState('');
+  const [discoveredWabaId, setDiscoveredWabaId] = useState('');
+  const [discoveredWaPhones, setDiscoveredWaPhones] = useState<string[]>([]);
 
   // Proof of life
   const [proofStats,    setProofStats]    = useState<AdInsights | null>(null);
@@ -696,6 +700,19 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
       setToken(t);
       const [accs, pgs] = await Promise.all([fetchAdAccounts(t), fetchPages(t)]);
       await finishMetaConnection(t, accs, pgs);
+
+      // Background: discover IG + WABA assets (non-blocking, best-effort)
+      void discoverAllAssets(t).then(assets => {
+        const mapped = mapAssetsToConfig(assets);
+        setDiscoveredIgId(mapped.metaInstagramAccountId);
+        setDiscoveredWabaId(mapped.wabaId);
+        setDiscoveredWaPhones(mapped.waPhoneNumbers);
+        saveUserConfig({
+          metaInstagramAccountId: mapped.metaInstagramAccountId,
+          wabaId:                 mapped.wabaId,
+          waPhoneNumbers:         mapped.waPhoneNumbers,
+        });
+      }).catch(() => { /* non-fatal */ });
     } catch (e) {
       setMetaError(e instanceof Error ? e.message : 'Connection failed.');
     } finally { setMetaLoading(false); }
@@ -716,11 +733,14 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
   function handleDone() {
     const cfg = getUserConfig();
     const mappings = {
-      website:       cfg.websiteUrl       || '',
-      metaAdAccount: cfg.metaAdAccountId  || selectedAccount || '',
-      metaPage:      cfg.metaFacebookPageId || selectedPage  || '',
-      tiktokId:      null as string | null,
-      lockedAt:      new Date().toISOString(),
+      website:             cfg.websiteUrl              || '',
+      metaAdAccount:       cfg.metaAdAccountId         || selectedAccount || '',
+      metaPage:            cfg.metaFacebookPageId      || selectedPage    || '',
+      instagramBusinessId: discoveredIgId              || cfg.metaInstagramAccountId || null,
+      wabaId:              discoveredWabaId            || cfg.wabaId      || null,
+      waPhoneNumbers:      discoveredWaPhones.length   ? discoveredWaPhones : cfg.waPhoneNumbers,
+      tiktokId:            null as string | null,
+      lockedAt:            new Date().toISOString(),
     };
     saveUserConfig({ completed: true, platformMappings: mappings });
 

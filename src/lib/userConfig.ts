@@ -2,11 +2,14 @@
 // Persistent localStorage service for per-user onboarding configuration.
 
 export interface PlatformMappings {
-  website:       string;
-  metaAdAccount: string;
-  metaPage:      string;
-  tiktokId:      string | null;
-  lockedAt:      string;   // ISO timestamp set at onboarding completion
+  website:             string;
+  metaAdAccount:       string;
+  metaPage:            string;
+  instagramBusinessId: string | null;   // IG Business Account ID linked to the FB Page
+  wabaId:              string | null;   // WhatsApp Business Account ID
+  waPhoneNumbers:      string[];        // Verified WABA phone number IDs (not display numbers)
+  tiktokId:            string | null;
+  lockedAt:            string;          // ISO timestamp set at onboarding completion
 }
 
 export interface UserConfig {
@@ -32,6 +35,9 @@ export interface UserConfig {
   proofOfLifeStats:       object | null;
   // TikTok (future)
   tiktokId:               string;
+  // WhatsApp Business
+  wabaId:                 string;
+  waPhoneNumbers:         string[];     // Verified WABA phone number IDs
   // Platform lock — verified mapping snapshot written at onboarding completion
   platformMappings:       PlatformMappings | null;
 }
@@ -57,6 +63,8 @@ const DEFAULTS: UserConfig = {
   siteApiUrl:             '',
   proofOfLifeStats:       null,
   tiktokId:               '',
+  wabaId:                 '',
+  waPhoneNumbers:         [],
   platformMappings:       null,
 };
 
