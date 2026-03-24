@@ -470,11 +470,10 @@ interface WelcomeStepProps {
 
 function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
   const [loginLoading, setLoginLoading] = useState<'fb' | 'ig' | null>(null);
-  const [loginError,   setLoginError]   = useState('');
   const isLoading = loginLoading !== null;
 
   async function handleSocialLogin(platform: 'fb' | 'ig') {
-    setLoginLoading(platform); setLoginError('');
+    setLoginLoading(platform);
     try {
       const token = await fbOAuthLogin();
       const [accs, pgs] = await Promise.all([
@@ -490,13 +489,9 @@ function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
         saveUserConfig(mapAssetsToConfig(assets));
       }).catch(() => {});
       onLoginDone();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Login failed';
-      if (msg === 'NO_APP_ID') {
-        setLoginError('Add VITE_META_APP_ID to your .env.local file (Meta for Developers → Your App → App ID)');
-      } else {
-        setLoginError(msg);
-      }
+    } catch {
+      // OAuth not configured — go straight to URL step
+      onStart();
     } finally { setLoginLoading(null); }
   }
 
@@ -537,15 +532,6 @@ function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
           </div>
         ))}
       </div>
-
-      {/* ── Primary CTA ── */}
-      <button
-        onClick={onStart}
-        disabled={isLoading}
-        className="w-full py-4 bg-yellow-400 hover:bg-yellow-300 active:scale-[0.98] disabled:opacity-60 text-black font-black rounded-xl flex items-center justify-center gap-2 text-lg transition-all shadow-lg shadow-yellow-400/20"
-      >
-        Get Started <ArrowRight size={20} />
-      </button>
 
       {/* ── Social login ── */}
       <div className="space-y-3">
@@ -612,11 +598,6 @@ function WelcomeStep({ onStart, onLoginDone, onSkip }: WelcomeStepProps) {
             {loginLoading === 'ig' ? 'Connecting…' : 'Continue with Instagram'}
           </button>
 
-          {loginError && (
-            <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/5 border border-red-400/15 rounded-lg p-2.5">
-              <AlertCircle size={12} className="shrink-0" /> {loginError}
-            </div>
-          )}
         </div>
 
       {/* Skip */}
