@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/BrandingService';
 import { scanBrand, saveBrand as saveBrandProfile } from '../lib/brandContext';
-import { saveUserConfig } from '../lib/userConfig';
+import { getUserConfig, saveUserConfig } from '../lib/userConfig';
 import Anthropic from '@anthropic-ai/sdk';
 import type { AdInsights } from '../lib/metaAds';
 import { fetchAccountInsights } from '../lib/metaAds';
@@ -714,7 +714,30 @@ function SetupStep({ onComplete }: { onComplete: () => void }) {
   }
 
   function handleDone() {
-    saveUserConfig({ completed: true });
+    const cfg = getUserConfig();
+    const mappings = {
+      website:       cfg.websiteUrl       || '',
+      metaAdAccount: cfg.metaAdAccountId  || selectedAccount || '',
+      metaPage:      cfg.metaFacebookPageId || selectedPage  || '',
+      tiktokId:      null as string | null,
+      lockedAt:      new Date().toISOString(),
+    };
+    saveUserConfig({ completed: true, platformMappings: mappings });
+
+    // Best-effort persist to Supabase (non-blocking; no session required)
+    void (async () => {
+      try {
+        const { supabase } = await import('../lib/supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase
+            .from('profiles')
+            .update({ platform_mappings: mappings })
+            .eq('id', session.user.id);
+        }
+      } catch { /* non-fatal */ }
+    })();
+
     onComplete();
   }
 

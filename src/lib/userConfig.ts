@@ -1,6 +1,14 @@
 // ─── User Config ─────────────────────────────────────────────────────────────
 // Persistent localStorage service for per-user onboarding configuration.
 
+export interface PlatformMappings {
+  website:       string;
+  metaAdAccount: string;
+  metaPage:      string;
+  tiktokId:      string | null;
+  lockedAt:      string;   // ISO timestamp set at onboarding completion
+}
+
 export interface UserConfig {
   completed:              boolean;
   // Brand DNA
@@ -17,10 +25,15 @@ export interface UserConfig {
   metaAdAccountId:        string;
   metaFacebookPageId:     string;
   metaInstagramAccountId: string;
+  // Website store integration
   siteAdminApiKey:        string;
   sitePlatformType:       string;   // 'shopify' | 'woocommerce' | 'custom' | ''
   siteApiUrl:             string;
   proofOfLifeStats:       object | null;
+  // TikTok (future)
+  tiktokId:               string;
+  // Platform lock — verified mapping snapshot written at onboarding completion
+  platformMappings:       PlatformMappings | null;
 }
 
 const KEY = 'zipit_user_config_v1';
@@ -43,6 +56,8 @@ const DEFAULTS: UserConfig = {
   sitePlatformType:       '',
   siteApiUrl:             '',
   proofOfLifeStats:       null,
+  tiktokId:               '',
+  platformMappings:       null,
 };
 
 export function getUserConfig(): UserConfig {

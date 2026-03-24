@@ -52,9 +52,25 @@ export async function runAgentLoop({
   // Fetch user profile, decrypt the stored Meta token, inject into system prompt
   const { data: rawProfile } = await supabase
     .from('profiles')
-    .select('brand_name, website_url, brand_colors, industry, tone, keywords, meta_access_token, meta_ad_account_id, meta_facebook_page_id, meta_instagram_account_id, site_admin_api_key, site_platform_type, site_api_url')
+    .select('brand_name, website_url, brand_colors, industry, tone, keywords, meta_access_token, meta_ad_account_id, meta_facebook_page_id, meta_instagram_account_id, site_admin_api_key, site_platform_type, site_api_url, platform_mappings')
     .eq('id', session.user.id)
     .single();
+
+  // ── Platform mapping lock: if a verified mapping exists, ensure IDs haven't drifted ──
+  const mapping = rawProfile?.platform_mappings as {
+    metaAdAccount?: string;
+    website?:       string;
+    lockedAt?:      string;
+  } | null | undefined;
+  if (mapping?.lockedAt && mapping.metaAdAccount) {
+    const currentAccountId = rawProfile?.meta_ad_account_id as string | undefined;
+    if (currentAccountId && currentAccountId !== mapping.metaAdAccount) {
+      throw new Error(
+        `Security: Meta Ad Account ID has changed since platform lock (locked: ${mapping.metaAdAccount}). ` +
+        `Re-verify your account in Settings to unlock execution.`,
+      );
+    }
+  }
 
   // ── Domain validation: site_api_url must match website_url ──────────────────
   if (rawProfile?.site_api_url && rawProfile?.website_url) {

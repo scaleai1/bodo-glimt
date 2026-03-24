@@ -12,6 +12,7 @@ import { ConnectionMap } from '../components/ConnectionMap';
 import { MetaLiveFeed } from '../components/MetaLiveFeed';
 import { AICreativeSuite } from '../components/AICreativeSuite';
 import { ToastProvider } from '../components/Toast';
+import { AnalystDashboard } from '../components/AnalystDashboard';
 import { useBrand } from '../lib/BrandingService';
 import { getUserConfig } from '../lib/userConfig';
 
@@ -644,7 +645,8 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const isRunning = conv.status === 'THINKING' || conv.status === 'WORKING';
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
-  const ACCENT = '#06b6d4';
+  const brand  = useBrand();
+  const ACCENT = brand.primary || '#06b6d4';
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -672,6 +674,9 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       tagline="Campaign Intelligence"
       onBack={onBack}
     >
+      {/* ── Live Visual Dashboard ── */}
+      <AnalystDashboard accent={ACCENT} />
+
       {/* ── System Connectivity Bar ── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
@@ -709,6 +714,14 @@ const AnalystPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <span style={{ fontSize: 11, color: siteConnected ? '#10b981' : '#6b7280', fontWeight: 600 }}>
             Website Management: {siteConnected ? `Connected (${cfg.sitePlatformType || 'custom'})` : 'Not configured'}
           </span>
+        </div>
+
+        <span style={{ color: '#374151', fontSize: 10 }}>|</span>
+
+        {/* TikTok placeholder */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#374151' }} />
+          <span style={{ fontSize: 11, color: '#4b5563', fontWeight: 600 }}>TikTok Ads: Soon™</span>
         </div>
 
         {/* Correlation Analysis button */}

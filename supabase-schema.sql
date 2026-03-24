@@ -331,3 +331,13 @@ create policy "Users can insert their own audit logs"
   with check (auth.uid() = user_id);
 
 grant select, insert on public.audit_logs to authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Platform Mappings — verified, locked platform associations per user.
+-- Populated on onboarding completion. Once locked_at is set, runAgentLoop
+-- refuses to execute if meta_ad_account_id has drifted from this snapshot.
+-- Structure: { website, metaAdAccount, metaPage, tiktokId, lockedAt }
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table public.profiles
+  add column if not exists platform_mappings jsonb not null default '{}';
