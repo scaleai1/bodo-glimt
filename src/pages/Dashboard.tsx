@@ -13,7 +13,7 @@ import { MetaLiveFeed } from '../components/MetaLiveFeed';
 import { AICreativeSuite } from '../components/AICreativeSuite';
 import { ToastProvider } from '../components/Toast';
 import { AnalystDashboard } from '../components/AnalystDashboard';
-import { useBrand } from '../lib/BrandingService';
+import { useBrand, applyBrand, loadBrand } from '../lib/BrandingService';
 import { getUserConfig } from '../lib/userConfig';
 import { supabase } from '../lib/supabase';
 
@@ -990,8 +990,11 @@ const CreativePage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
 const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => {} }) => {
   const brand = useBrand();
 
-  // ── Session + Brand DNA debug log ──────────────────────────────────────────
+  // ── Brand re-apply + Session + Brand DNA debug log ─────────────────────────
   useEffect(() => {
+    // Re-apply brand CSS vars for this user's session immediately on mount
+    applyBrand(loadBrand());
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       const cfg = getUserConfig();
       console.group('%c🔍 Dashboard loaded — session & brand DNA', 'color:#F0B429;font-weight:bold');

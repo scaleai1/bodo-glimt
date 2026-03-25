@@ -8,6 +8,7 @@ import { resolveBrand, applyBrand, saveBrand as saveBrandConfig } from '../lib/B
 import { scanBrand, saveBrand as saveBrandProfile } from '../lib/brandContext';
 import { getUserConfig, saveUserConfig } from '../lib/userConfig';
 import { supabase } from '../lib/supabase';
+import { encryptToken } from '../lib/tokenCrypto';
 import Anthropic from '@anthropic-ai/sdk';
 
 // ── Persist platform mappings (local + Supabase) ──────────────────────────────
@@ -565,6 +566,38 @@ function URLStep({ onComplete }: { onComplete: () => void }) {
 
   function handleDone() {
     buildAndSaveMappings();
+    // Upsert brand DNA + encrypted Meta token to Supabase — scoped strictly to session UID
+    void (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const uid = session.user.id;
+        const cfg = getUserConfig();
+        const rawToken = cfg.metaAccessToken || (import.meta.env.VITE_META_ACCESS_TOKEN as string | undefined) || '';
+        const encryptedToken = rawToken ? await encryptToken(rawToken, uid) : '';
+        await supabase.from('profiles').upsert({
+          id:                   uid,
+          brand_name:           cfg.brandName       || '',
+          website_url:          cfg.websiteUrl      || '',
+          brand_logo_url:       cfg.logoUrl         || '',
+          brand_colors:         cfg.primaryColor    ? { primary: cfg.primaryColor, secondary: cfg.secondaryColor || '' } : null,
+          industry:             cfg.industry        || '',
+          tone:                 cfg.tone            || '',
+          keywords:             cfg.keywords        ?? [],
+          meta_access_token:    encryptedToken,
+          meta_ad_account_id:   cfg.metaAdAccountId || '',
+          meta_facebook_page_id:    cfg.metaFacebookPageId     || '',
+          meta_instagram_account_id: cfg.metaInstagramAccountId || '',
+          onboarding_completed: true,
+        }, { onConflict: 'id' });
+        console.log(
+          `%c✅ Onboarding Complete for ${cfg.brandName || 'your brand'}. Data is isolated and secure.`,
+          'color:#22c55e;font-weight:bold;font-size:13px',
+        );
+      } catch (e) {
+        console.warn('Profile upsert failed (non-fatal):', e);
+      }
+    })();
     onComplete();
   }
 
