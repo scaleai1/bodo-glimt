@@ -15,6 +15,7 @@ import { ToastProvider } from '../components/Toast';
 import { AnalystDashboard } from '../components/AnalystDashboard';
 import { useBrand } from '../lib/BrandingService';
 import { getUserConfig } from '../lib/userConfig';
+import { supabase } from '../lib/supabase';
 
 
 import type { CampaignPair } from '../components/CampaignView';
@@ -988,6 +989,22 @@ const CreativePage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
 
 const DashboardInner: React.FC<{ onLogout?: () => void }> = ({ onLogout = () => {} }) => {
   const brand = useBrand();
+
+  // ── Session + Brand DNA debug log ──────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const cfg = getUserConfig();
+      console.group('%c🔍 Dashboard loaded — session & brand DNA', 'color:#F0B429;font-weight:bold');
+      console.log('User UID  :', session?.user?.id ?? '(no session)');
+      console.log('Email     :', session?.user?.email ?? '—');
+      console.log('Provider  :', session?.user?.app_metadata?.provider ?? '—');
+      console.log('Brand name:', cfg.brandName  || '(not set)');
+      console.log('Website   :', cfg.websiteUrl || '(not set)');
+      console.log('Primary color:', cfg.primaryColor || '(not set)');
+      console.log('Meta Ad Account:', cfg.metaAdAccountId || '(not set)');
+      console.groupEnd();
+    });
+  }, []);
 
   const [settingsOpen,     setSettingsOpen]     = useState(false);
   const [orchestratorOpen, setOrchestratorOpen] = useState(false);
